@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1600" height="600" viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0%" stop-color="#0f172a" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#0b69a3" stop-opacity="0.75"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="600" fill="#e9f2f7" />
+  <rect width="1600" height="600" fill="url(#g)" />
+
+  <!-- abstract medical elements -->
+  <g transform="translate(1200,80) scale(1.6)">
+    <circle cx="0" cy="0" r="70" fill="#fff" opacity="0.05" />
+    <path d="M-90 60 C -40 10, 40 10, 90 60" stroke="#ffffff33" stroke-width="14" fill="none" stroke-linecap="round" />
+    <path d="M-40 -10 L -20 10 L 20 -30 L 40 -10" stroke="#ffffff55" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- stylized stethoscope-like shape -->
+  <g transform="translate(200,240) scale(1.2)">
+    <path d="M20,0 C20,40 60,60 100,60 C140,60 180,40 180,0" stroke="#ffffff88" stroke-width="10" fill="none" stroke-linecap="round"/>
+    <circle cx="110" cy="100" r="40" fill="#ffffff22" stroke="#ffffff66" stroke-width="6" />
+    <circle cx="110" cy="100" r="14" fill="#fff" />
+  </g>
+
+  <!-- subtle pattern -->
+  <g opacity="0.03" fill="#fff">
+    <rect x="40" y="40" width="260" height="160" rx="14" />
+    <rect x="340" y="120" width="360" height="220" rx="14" />
+  </g>
+</svg>
+
+
