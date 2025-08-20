@@ -96,7 +96,7 @@ const DashboardPage = () => {
     }
 
     if (user?.role === 'admin') {
-      actions.push({ title: 'Manage Users', path: '/admin/users', icon: <People /> });
+      actions.push({ title: 'Manage Users', path: '/manage-users', icon: <People /> });
     }
 
     return actions;

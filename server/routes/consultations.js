@@ -11,7 +11,7 @@ const User = require('../models/User');
 // @access  Private
 router.get('/', [
   authenticateToken,
-  query('status').optional().isIn(['scheduled', 'in_progress', 'completed', 'cancelled']),
+  query('status').optional().isIn(['requested', 'scheduled', 'in_progress', 'completed', 'cancelled', 'denied']),
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 })
 ], async (req, res) => {
@@ -29,7 +29,12 @@ router.get('/', [
 
     // Build query based on user role
     const query = {};
-    if (status) query.status = status;
+    if (status) {
+      query.status = status;
+    } else {
+      // Default: exclude 'completed' and 'denied' statuses from the main view
+      query.status = { $nin: ['completed', 'denied'] };
+    }
 
     // Filter by user role (doctors and health workers see provider-side)
     if (req.user.role === 'doctor') {
@@ -137,8 +142,8 @@ router.post('/', [
 // Provider respond endpoint
 router.post('/:id/respond', [
   authenticateToken,
-  authorizeRole('health_worker', 'doctor', 'ngo', 'admin'),
-  body('action').isIn(['accept','deny']).withMessage('Invalid action')
+  authorizeRole('health_worker', 'doctor', 'ngo', 'admin', 'patient'),
+  body('action').isIn(['accept','deny','completed']).withMessage('Invalid action')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -149,10 +154,14 @@ router.post('/:id/respond', [
 
     const consultation = await Consultation.findById(id).populate('patient', 'firstName lastName email');
     if (!consultation) return res.status(404).json({ success: false, message: 'Consultation not found' });
-    if (String(consultation.provider) !== String(req.user._id)) return res.status(403).json({ success: false, message: 'Not authorized' });
+    // Allow provider or patient to respond/dismiss their own consultation
+    if (String(consultation.provider) !== String(req.user._id) && String(consultation.patient._id) !== String(req.user._id)) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
 
     if (action === 'accept') consultation.status = 'scheduled';
     if (action === 'deny') consultation.status = 'denied';
+    if (action === 'completed') consultation.status = 'completed'; // Handle 'completed' action
     await consultation.save();
 
     // notify patient

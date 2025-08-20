@@ -248,7 +248,29 @@ const ConsultationsPage = () => {
                       </>
                     )}
                     {c.status === 'scheduled' && (c.type === 'video' || c.type === 'audio') && (
-                      <Button size="small" onClick={() => { setCallInfo({ id: c._id || c.id, type: c.type }); setOpenCall(true); }}>Join</Button>
+                      c.scheduledAt && new Date(c.scheduledAt) > new Date() ? (
+                        <Button size="small" onClick={() => { setCallInfo({ id: c._id || c.id, type: c.type }); setOpenCall(true); }}>Join</Button>
+                      ) : (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="caption" color="text.secondary">Time Over</Typography>
+                          {(role === 'health_worker' || role === 'doctor' || role === 'admin' || role === 'ngo' || role === 'patient') && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="info"
+                              onClick={async () => {
+                                try {
+                                  await consultationService.respond(c._id || c.id, 'completed', token); // Update status to completed
+                                  notify.showSuccess('Consultation dismissed.');
+                                  fetchConsultations(); // Refresh list
+                                } catch (e) {
+                                  notify.showError('Failed to dismiss consultation.');
+                                }
+                              }}
+                            >Dismiss</Button>
+                          )}
+                        </Box>
+                      )
                     )}
                   </CardActions>
                 </Card>
@@ -288,6 +310,9 @@ const ConsultationsPage = () => {
           <DialogTitle>Book a Consultation</DialogTitle>
           <DialogContent>
             <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>Patient: {user?.firstName} {user?.lastName}</Typography>
+              </Grid>
               <Grid item xs={12}>
                 <FormControl fullWidth>
                   <InputLabel>Doctor</InputLabel>

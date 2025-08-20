@@ -2,6 +2,7 @@ const express = require('express');
 const { query, validationResult } = require('express-validator');
 const User = require('../models/User');
 const { optionalAuth } = require('../middleware/auth');
+const { authenticateToken, authorizeRole } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -31,6 +32,56 @@ router.get('/', [
   } catch (err) {
     console.error('Get users error:', err);
     res.status(500).json({ success: false, message: 'Failed to get users' });
+  }
+});
+
+// @route   PATCH /api/users/:id
+// @desc    Update user profile (e.g., specialization for doctors)
+// @access  Private (Admin or Self)
+router.patch('/:id', [
+  authenticateToken,
+  authorizeRole('admin', 'doctor', 'health_worker'), // Only admin or the user themselves can update
+], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { specialization, ...otherUpdates } = req.body;
+
+    // Ensure only authorized users can update other users' profiles
+    if (req.user.role !== 'admin' && String(req.user._id) !== id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to update this user' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Update specific fields. For specialization, it's inside providerInfo
+    if (specialization !== undefined) {
+      if (!user.providerInfo) {
+        user.providerInfo = {};
+      }
+      user.providerInfo.specialization = Array.isArray(specialization) ? specialization : [specialization];
+    }
+
+    // Apply other direct updates (e.g., phone, address, etc. if allowed by schema)
+    Object.keys(otherUpdates).forEach(key => {
+      // Prevent direct role changes via this endpoint by non-admins
+      if (key === 'role' && req.user.role !== 'admin') {
+        delete otherUpdates[key];
+      }
+      if (user[key] !== undefined) {
+        user[key] = otherUpdates[key];
+      }
+    });
+    
+    await user.save();
+
+    res.json({ success: true, message: 'User profile updated successfully', data: { user: user.getPublicProfile() } });
+
+  } catch (err) {
+    console.error('Update user error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update user profile' });
   }
 });
 

@@ -25,6 +25,7 @@ import ProfilePage from './pages/ProfilePage';
 import HealthReportPage from './pages/HealthReportPage';
 import FeedbackReferralPage from './pages/FeedbackReferralPage';
 import NotFoundPage from './pages/NotFoundPage';
+import ManageUsersPage from './pages/ManageUsersPage';
 
 // Protected Route Component
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -98,6 +99,11 @@ function App() {
                   <Route path="/feedback-referrals" element={
                     <ProtectedRoute>
                       <FeedbackReferralPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/manage-users" element={
+                    <ProtectedRoute>
+                      <ManageUsersPage />
                     </ProtectedRoute>
                   } />
                   
