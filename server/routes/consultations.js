@@ -3,6 +3,8 @@ const { body, validationResult, query } = require('express-validator');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 
 const router = express.Router();
+const Consultation = require('../models/Consultation');
+const User = require('../models/User');
 
 // @route   GET /api/consultations
 // @desc    Get consultations
@@ -29,25 +31,26 @@ router.get('/', [
     const query = {};
     if (status) query.status = status;
 
-    // Filter by user role
-    if (req.user.role === 'healthcare_provider') {
+    // Filter by user role (doctors and health workers see provider-side)
+    if (req.user.role === 'doctor') {
       query.provider = req.user._id;
+      query.providerRole = 'doctor'; // Add a filter for the provider's role
+    } else if (req.user.role === 'health_worker') {
+      query.provider = req.user._id;
+      query.providerRole = 'health_worker'; // Add a filter for the provider's role
     } else {
       query.patient = req.user._id;
+      // No providerRole needed for patients
     }
 
-    // Mock data for now - in real implementation, you'd have a Consultation model
-    const consultations = [
-      {
-        id: '1',
-        patient: { id: '1', name: 'John Doe', email: 'john@example.com' },
-        provider: { id: '2', name: 'Dr. Smith', email: 'smith@example.com' },
-        scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        status: 'scheduled',
-        type: 'video',
-        notes: 'Follow-up consultation'
-      }
-    ];
+    // Query DB for consultations
+    const total = await Consultation.countDocuments(query);
+    const consultations = await Consultation.find(query)
+      .populate('patient', 'firstName lastName email providerInfo')
+      .populate('provider', 'firstName lastName email providerInfo')
+      .sort({ scheduledAt: -1 })
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
 
     res.json({
       success: true,
@@ -55,9 +58,9 @@ router.get('/', [
         consultations,
         pagination: {
           current: parseInt(page),
-          total: 1,
-          hasNext: false,
-          hasPrev: false
+          total: Math.ceil(total / parseInt(limit)),
+          hasNext: parseInt(page) * parseInt(limit) < total,
+          hasPrev: parseInt(page) > 1
         }
       }
     });
@@ -94,22 +97,32 @@ router.post('/', [
 
     const { providerId, scheduledAt, type, notes } = req.body;
 
-    // Mock consultation creation
-    const consultation = {
-      id: Date.now().toString(),
-      patient: req.user,
-      provider: { id: providerId, name: 'Dr. Provider' },
+    // Create consultation request
+    const consultation = new Consultation({
+      patient: req.user._id,
+      provider: providerId,
       scheduledAt: new Date(scheduledAt),
-      status: 'scheduled',
       type,
-      notes: notes || ''
-    };
-
-    res.status(201).json({
-      success: true,
-      message: 'Consultation booked successfully',
-      data: { consultation }
+      notes: notes || '',
+      status: 'requested',
+      // Fetch the provider's role to save it with the consultation
+      providerRole: (await User.findById(providerId))?.role // Assuming providerId will always have a role
     });
+    await consultation.save();
+
+    // notify provider via socket
+    try {
+      const io = req.app.get('io');
+      const payload = await consultation.populate('patient', 'firstName lastName email');
+      if (io) {
+        console.log('Emitting consultation:requested to provider', providerId);
+        io.to(String(providerId)).emit('consultation:requested', payload);
+      }
+    } catch (e) {
+      console.error('Socket emit error:', e);
+    }
+
+    res.status(201).json({ success: true, message: 'Consultation request sent', data: { consultation } });
 
   } catch (error) {
     console.error('Book consultation error:', error);
@@ -118,6 +131,40 @@ router.post('/', [
       message: 'Failed to book consultation',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
+  }
+});
+
+// Provider respond endpoint
+router.post('/:id/respond', [
+  authenticateToken,
+  authorizeRole('health_worker', 'doctor', 'ngo', 'admin'),
+  body('action').isIn(['accept','deny']).withMessage('Invalid action')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+
+    const { id } = req.params;
+    const { action } = req.body;
+
+    const consultation = await Consultation.findById(id).populate('patient', 'firstName lastName email');
+    if (!consultation) return res.status(404).json({ success: false, message: 'Consultation not found' });
+    if (String(consultation.provider) !== String(req.user._id)) return res.status(403).json({ success: false, message: 'Not authorized' });
+
+    if (action === 'accept') consultation.status = 'scheduled';
+    if (action === 'deny') consultation.status = 'denied';
+    await consultation.save();
+
+    // notify patient
+    try {
+      const io = req.app.get('io');
+      if (io) io.to(String(consultation.patient._id)).emit('consultation:responded', consultation);
+    } catch (e) {}
+
+    return res.json({ success: true, message: `Consultation ${action}ed`, data: { consultation } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

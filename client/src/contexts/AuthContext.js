@@ -42,8 +42,9 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       const response = await authService.login(email, password);
       const { user: userData, token } = response.data.data;
-      
+
       localStorage.setItem('token', token);
+      localStorage.setItem('role', userData.role);
       setUser(userData);
       
       return { success: true };
@@ -59,8 +60,9 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       const response = await authService.register(userData);
       const { user: newUser, token } = response.data.data;
-      
+
       localStorage.setItem('token', token);
+      localStorage.setItem('role', newUser.role);
       setUser(newUser);
       
       return { success: true };
@@ -73,6 +75,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('role');
     setUser(null);
     setError(null);
     navigate('/');

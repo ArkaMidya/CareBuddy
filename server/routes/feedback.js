@@ -10,7 +10,7 @@ const router = express.Router();
 // @access  Private (Healthcare providers, admins)
 router.get('/', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'admin'),
+  authorizeRole('health_worker', 'doctor', 'admin'),
   query('type').optional().isIn(['care_quality', 'wait_time', 'communication', 'facility', 'medication', 'follow_up', 'general']),
   query('status').optional().isIn(['pending', 'reviewed', 'addressed', 'resolved', 'closed']),
   query('priority').optional().isIn(['low', 'medium', 'high', 'critical']),
@@ -184,7 +184,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // @access  Private (Healthcare providers, admins)
 router.put('/:id/respond', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'admin'),
+  authorizeRole('doctor', 'health_worker', 'admin'),
   body('content').trim().isLength({ min: 10, max: 1000 }).withMessage('Response must be between 10 and 1000 characters')
 ], async (req, res) => {
   try {
@@ -252,7 +252,7 @@ router.put('/:id/respond', [
 // @access  Private (Healthcare providers, admins)
 router.put('/:id/status', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'admin'),
+  authorizeRole('doctor', 'health_worker', 'admin'),
   body('status').isIn(['pending', 'reviewed', 'addressed', 'resolved', 'closed']).withMessage('Invalid status'),
   body('followUpRequired').optional().isBoolean(),
   body('followUpDate').optional().isISO8601().toDate()
@@ -309,7 +309,7 @@ router.put('/:id/status', [
 // @access  Private (Healthcare providers, admins)
 router.get('/stats/overview', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'admin')
+  authorizeRole('doctor', 'health_worker', 'admin')
 ], async (req, res) => {
   try {
     const stats = await Feedback.aggregate([

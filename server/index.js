@@ -78,6 +78,8 @@ app.use('/api/education', educationRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/referrals', referralRoutes);
+const usersRoutes = require('./routes/users');
+app.use('/api/users', usersRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -97,8 +99,48 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
+// Start server with Socket.IO for real-time notifications
+const http = require('http');
+const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: process.env.NODE_ENV === 'production' ? ['https://carebody.org', 'https://www.carebody.org'] : ['http://localhost:3000'],
+    methods: ['GET', 'POST']
+  }
+});
+
+// Optional socket auth: extract userId from JWT and join a room per user
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth && socket.handshake.auth.token;
+    if (!token) return next();
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.userId = decoded.userId;
+    return next();
+  } catch (err) {
+    // allow anonymous connections
+    return next();
+  }
+});
+
+io.on('connection', (socket) => {
+  if (socket.userId) {
+    socket.join(String(socket.userId));
+    console.log(`Socket connected for user ${socket.userId}`);
+  }
+  socket.on('joinRoom', (room) => {
+    if (room) socket.join(room);
+  });
+});
+
+// Expose io to routes via app.set
+app.set('io', io);
+
+server.listen(PORT, () => {
   console.log(`🚀 CareBody Health Ecosystem Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);

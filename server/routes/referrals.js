@@ -7,10 +7,10 @@ const router = express.Router();
 
 // @route   GET /api/referrals
 // @desc    Get referrals with filtering and pagination
-// @access  Private (Healthcare providers, admins)
+// @access  Private (Health workers, admins)
 router.get('/', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'admin'),
+  authorizeRole('health_worker', 'doctor', 'ngo', 'admin'),
   query('type').optional().isIn(['specialist', 'diagnostic', 'treatment', 'follow_up', 'emergency', 'preventive']),
   query('status').optional().isIn(['pending', 'accepted', 'in_progress', 'completed', 'cancelled', 'expired']),
   query('priority').optional().isIn(['routine', 'urgent', 'emergency']),
@@ -93,7 +93,7 @@ router.get('/', [
 // @access  Private (Healthcare providers, admins)
 router.post('/', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'admin'),
+  authorizeRole('doctor', 'health_worker', 'admin'),
   body('title').trim().isLength({ min: 5, max: 200 }).withMessage('Title must be between 5 and 200 characters'),
   body('description').trim().isLength({ min: 10, max: 1000 }).withMessage('Description must be between 10 and 1000 characters'),
   body('type').isIn(['specialist', 'diagnostic', 'treatment', 'follow_up', 'emergency', 'preventive']).withMessage('Invalid referral type'),
@@ -194,7 +194,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // @access  Private (Healthcare providers, admins)
 router.put('/:id/accept', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'admin'),
+  authorizeRole('doctor', 'health_worker', 'admin'),
   body('appointmentDate').optional().isISO8601().toDate().withMessage('Invalid appointment date'),
   body('appointmentTime').optional().trim().notEmpty().withMessage('Appointment time is required if date is provided')
 ], async (req, res) => {
@@ -266,7 +266,7 @@ router.put('/:id/accept', [
 // @access  Private (Healthcare providers, admins)
 router.put('/:id/update-status', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'admin'),
+  authorizeRole('doctor', 'health_worker', 'admin'),
   body('status').isIn(['pending', 'accepted', 'in_progress', 'completed', 'cancelled', 'expired']).withMessage('Invalid status'),
   body('outcome').optional().isIn(['improved', 'stable', 'worsened', 'resolved', 'ongoing']),
   body('outcomeNotes').optional().trim().notEmpty()
@@ -324,7 +324,7 @@ router.put('/:id/update-status', [
 // @access  Private (Healthcare providers, admins)
 router.post('/:id/notes', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'admin'),
+  authorizeRole('doctor', 'health_worker', 'admin'),
   body('content').trim().isLength({ min: 5, max: 500 }).withMessage('Note content must be between 5 and 500 characters')
 ], async (req, res) => {
   try {
@@ -380,7 +380,7 @@ router.post('/:id/notes', [
 // @access  Private (Healthcare providers, admins)
 router.get('/stats/overview', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'admin')
+  authorizeRole('doctor', 'health_worker', 'admin')
 ], async (req, res) => {
   try {
     const stats = await Referral.aggregate([

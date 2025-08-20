@@ -99,16 +99,29 @@ const CampaignDetailsPage = () => {
               {
                 (() => {
                   const scheduleFirst = campaign.schedule && campaign.schedule.length ? campaign.schedule[0] : null;
-                  const displayDate = campaign.campaignDate
-                    ? new Date(campaign.campaignDate).toLocaleString()
-                    : (scheduleFirst ? `${new Date(scheduleFirst.date).toLocaleDateString()}${scheduleFirst.time ? ` ${scheduleFirst.time}` : ''}` : 'TBD');
-                  return <Typography variant="body2">Date: {displayDate}</Typography>;
+                    const formatDate = (dateStr) => {
+                      if (!dateStr) return 'TBD';
+                      const d = new Date(dateStr);
+                      const day = String(d.getDate()).padStart(2, '0');
+                      const month = String(d.getMonth() + 1).padStart(2, '0');
+                      const year = d.getFullYear();
+                      return `${day}/${month}/${year}`;
+                    };
+                    const displayDate = campaign.campaignDate
+                      ? formatDate(campaign.campaignDate)
+                      : (scheduleFirst ? `${formatDate(scheduleFirst.date)}${scheduleFirst.time ? ` ${scheduleFirst.time}` : ''}` : 'TBD');
+                    return <Typography variant="body2">Date: {displayDate}</Typography>;
                 })()
               }
             </Box>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <CountdownTimer deadline={campaign.registrationDeadline} />
               {(() => {
+                const now = new Date();
+                const campaignHeld = campaign.campaignDate && new Date(campaign.campaignDate) < now;
+                if (campaignHeld) {
+                  return <Button variant="outlined" color="secondary" disabled>Already Held</Button>;
+                }
                 if (alreadyRegistered) return <Alert severity="success">You have already registered</Alert>;
                 if (campaign.status === 'cancelled') return <Chip label="Cancelled" color="error" />;
                 if (regClosed) return <Chip label="Registration closed" color="warning" />;

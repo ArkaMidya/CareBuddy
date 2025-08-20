@@ -72,57 +72,14 @@ router.get('/', [
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Mock campaign detail
-    const campaign = {
-      id,
-      title: 'Comprehensive Health Checkup Drive',
-      type: 'health_checkup',
-      status: 'active',
-      description: 'Free comprehensive health checkup including blood pressure, diabetes screening, and general consultation',
-      startDate: new Date('2024-01-15'),
-      endDate: new Date('2024-03-15'),
-      location: {
-        address: 'Community Health Center',
-        city: 'New York',
-        state: 'NY',
-        zipCode: '10001',
-        coordinates: { latitude: 40.7128, longitude: -74.0060 }
-      },
-      organizer: {
-        name: 'City Health Department',
-        contact: '+1-555-0123',
-        email: 'health@city.gov'
-      },
-      targetAudience: 'Adults 40+',
-      capacity: 500,
-      registered: 320,
-      image: '/images/health-checkup.jpg',
-      tags: ['health-checkup', 'screening', 'preventive-care'],
-      schedule: [
-        { date: '2024-01-15', time: '09:00-17:00', slots: 50 },
-        { date: '2024-01-16', time: '09:00-17:00', slots: 50 },
-        { date: '2024-01-17', time: '09:00-17:00', slots: 50 }
-      ],
-      services: [
-        'Blood pressure measurement',
-        'Blood glucose test',
-        'BMI calculation',
-        'General consultation',
-        'Health education'
-      ],
-      requirements: [
-        'Valid ID proof',
-        'Fasting for 8 hours (for glucose test)',
-        'Pre-registration recommended'
-      ]
-    };
-
+    const campaign = await Campaign.findById(id).lean();
+    if (!campaign) {
+      return res.status(404).json({ success: false, message: 'Campaign not found' });
+    }
     res.json({
       success: true,
       data: { campaign }
     });
-
   } catch (error) {
     console.error('Get campaign detail error:', error);
     res.status(500).json({
@@ -223,7 +180,7 @@ router.patch('/:id/cancel', [
     if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found' });
 
     // allow organizer or admin/ngo/health_worker
-    const allowedRoles = ['admin', 'ngo_worker', 'health_worker', 'healthcare_provider'];
+    const allowedRoles = ['admin', 'ngo', 'health_worker', 'doctor'];
     const isOrganizer = String(campaign.organizer) === String(req.user._id);
     if (!(isOrganizer || allowedRoles.includes(req.user.role))) {
       return res.status(403).json({ success: false, message: 'Not authorized to cancel this campaign' });
@@ -244,7 +201,7 @@ router.patch('/:id/cancel', [
 // @access  Private
 router.post('/', [
   authenticateToken,
-  authorizeRole('admin', 'healthcare_provider', 'ngo_worker', 'health_worker'),
+  authorizeRole('admin', 'ngo', 'health_worker', 'doctor'),
   body('title').trim().isLength({ min: 5, max: 200 }).withMessage('Title must be between 5 and 200 characters'),
   body('type').isIn(['immunization', 'health_checkup', 'mental_health', 'blood_donation', 'wellness', 'awareness']).withMessage('Invalid campaign type'),
   body('description').trim().isLength({ min: 10 }).withMessage('Description must be at least 10 characters'),

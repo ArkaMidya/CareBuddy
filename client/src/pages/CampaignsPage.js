@@ -222,7 +222,7 @@ const CampaignsPage = () => {
             <Button onClick={() => { setFilterType(''); setFilterStatus(''); }}>Clear</Button>
           </Box>
 
-          {user && ['admin','ngo_worker','health_worker','healthcare_provider'].includes(user.role) && (
+          {user && ['admin','ngo','health_worker'].includes(user.role) && (
             <Button variant="contained" onClick={() => { setCreateErrors({}); setOpenCreate(true); }}>Create Campaign</Button>
           )}
         </Box>
@@ -246,13 +246,13 @@ const CampaignsPage = () => {
                       {c.status !== 'cancelled' && <CountdownTimer deadline={c.registrationDeadline} />}
                     </Box>
                   </CardContent>
-                  <CardActions>
+                  <CardActions sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                     <Button size="small" component={RouterLink} to={`/campaigns/${id}`}>Details</Button>
                     <Button size="small" onClick={() => AddToCalendar(c, null, null, null)} disabled={isCancelled || (c.registrationDeadline && new Date() > new Date(c.registrationDeadline))}>Add to Calendar</Button>
                     {/* Render exactly one registration status or action */}
                     {(() => {
                       // If campaign creator or authorized roles, show cancel button when not cancelled
-                      const allowedCancelRoles = ['admin','ngo_worker','health_worker','healthcare_provider'];
+                      const allowedCancelRoles = ['admin','ngo','health_worker'];
                       const isOrganizer = !!(c.organizer && (String(c.organizer) === String(user?._id || user?.id)));
                       const canCancel = isOrganizer || allowedCancelRoles.includes(user?.role);
 

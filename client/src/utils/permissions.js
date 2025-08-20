@@ -1,9 +1,10 @@
 // Role-based access control for health reports
 export const ROLES = {
   ADMIN: 'admin',
+  DOCTOR: 'doctor',
   HEALTH_WORKER: 'health_worker',
-  HEALTHCARE_PROVIDER: 'healthcare_provider',
-  NGO_WORKER: 'ngo_worker',
+  // removed healthcare_provider
+  NGO: 'ngo',
   PATIENT: 'patient',
   USER: 'user'
 };
@@ -14,8 +15,8 @@ export const canManageHealthReports = (user) => {
   
   return [
     ROLES.ADMIN,
-    ROLES.HEALTH_WORKER,
-    ROLES.HEALTHCARE_PROVIDER
+    ROLES.DOCTOR,
+    ROLES.HEALTH_WORKER
   ].includes(user.role);
 };
 
@@ -35,9 +36,9 @@ export const canEditHealthReports = (user) => {
   
   return [
     ROLES.ADMIN,
+    ROLES.DOCTOR,
     ROLES.HEALTH_WORKER,
-    ROLES.HEALTHCARE_PROVIDER,
-    ROLES.NGO_WORKER
+    ROLES.NGO
   ].includes(user.role);
 };
 
@@ -47,9 +48,9 @@ export const canViewAllReports = (user) => {
   
   return [
     ROLES.ADMIN,
+    ROLES.DOCTOR,
     ROLES.HEALTH_WORKER,
-    ROLES.HEALTHCARE_PROVIDER,
-    ROLES.NGO_WORKER
+    ROLES.NGO
   ].includes(user.role);
 };
 
@@ -59,9 +60,9 @@ export const getRoleDisplayName = (role) => {
   
   const roleMap = {
     [ROLES.ADMIN]: 'Administrator',
+    [ROLES.DOCTOR]: 'Doctor',
     [ROLES.HEALTH_WORKER]: 'Health Worker',
-    [ROLES.HEALTHCARE_PROVIDER]: 'Healthcare Provider',
-    [ROLES.NGO_WORKER]: 'NGO Worker',
+    [ROLES.NGO]: 'NGO',
     [ROLES.PATIENT]: 'Patient',
     [ROLES.USER]: 'User'
   };

@@ -23,7 +23,7 @@ router.post('/register', [
   body('lastName').trim().isLength({ min: 2, max: 50 }).withMessage('Last name must be between 2 and 50 characters'),
   body('email').isEmail().normalizeEmail().withMessage('Please enter a valid email'),
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
-  body('role').isIn(['patient', 'healthcare_provider', 'health_worker', 'ngo_worker', 'admin', 'user']).withMessage('Invalid role'),
+  body('role').isIn(['patient', 'doctor', 'health_worker', 'ngo', 'admin', 'user']).withMessage('Invalid role'),
   body('phone').optional().isMobilePhone('any').withMessage('Please enter a valid phone number')
 ], async (req, res) => {
   try {
@@ -37,7 +37,7 @@ router.post('/register', [
       });
     }
 
-    const { firstName, lastName, email, password, role, phone, dateOfBirth, gender, street, city, state, zipCode, licenseNo, organization, qualification } = req.body;
+    const { firstName, lastName, email, password, role, phone, dateOfBirth, gender, street, city, state, zipCode, licenseNo, organization, qualification, specialization } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -70,10 +70,10 @@ router.post('/register', [
     });
 
     // Add role-specific information
-    if (['health_worker', 'healthcare_provider'].includes(role)) {
+    if (role === 'doctor' || role === 'health_worker') {
       user.providerInfo = {
         licenseNumber: licenseNo || '',
-        specialization: [],
+        specialization: specialization ? (Array.isArray(specialization) ? specialization : [specialization]) : [],
         experience: 0,
         education: [],
         certifications: []
@@ -83,7 +83,7 @@ router.post('/register', [
         designation: '',
         areaOfService: []
       };
-    } else if (role === 'ngo_worker') {
+    } else if (role === 'ngo') {
       user.workerInfo = {
         organization: '',
         designation: qualification || '',

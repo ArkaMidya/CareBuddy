@@ -10,7 +10,6 @@ const router = express.Router();
 // @access  Private (Health workers, providers, admins)
 router.get('/', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'ngo_worker', 'admin'),
   query('type').optional().isIn(['illness', 'outbreak', 'mental_health_crisis', 'injury', 'environmental_hazard', 'medication_shortage', 'other']),
   query('status').optional().isIn(['pending', 'investigating', 'confirmed', 'resolved', 'false_alarm']),
   query('priority').optional().isIn(['low', 'medium', 'high', 'critical']),
@@ -47,6 +46,13 @@ router.get('/', [
     if (type) query.type = type;
     if (status) query.status = status;
     if (priority) query.priority = priority;
+
+   // If patient, only allow their own reports
+   if (req.user.role === 'patient') {
+     query.reporter = req.user._id;
+   } else if (!['health_worker', 'doctor', 'ngo', 'admin'].includes(req.user.role)) {
+     return res.status(403).json({ success: false, message: 'Not authorized to view reports' });
+   }
 
     let reports;
     
@@ -174,7 +180,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // @access  Private (Health workers, providers, admins)
 router.put('/:id/status', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'ngo_worker', 'admin'),
+  authorizeRole('health_worker', 'doctor', 'ngo', 'admin'),
   body('status').isIn(['pending', 'investigating', 'confirmed', 'resolved', 'false_alarm']).withMessage('Invalid status'),
   body('notes').optional().trim()
 ], async (req, res) => {
@@ -241,7 +247,7 @@ router.put('/:id/status', [
 // @access  Private (Health workers, providers, admins)
 router.post('/:id/assign', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'ngo_worker', 'admin'),
+  authorizeRole('health_worker', 'doctor', 'ngo', 'admin'),
   body('userId').isMongoId().withMessage('Valid user ID is required'),
   body('role').trim().notEmpty().withMessage('Role is required')
 ], async (req, res) => {
@@ -319,7 +325,7 @@ router.post('/:id/assign', [
 // @access  Private (Health workers, providers, admins)
 router.post('/:id/escalate', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'ngo_worker', 'admin'),
+  authorizeRole('health_worker', 'doctor', 'ngo', 'admin'),
   body('reason').trim().notEmpty().withMessage('Escalation reason is required')
 ], async (req, res) => {
   try {
@@ -383,7 +389,7 @@ router.delete('/:id', [
 
     // Check if user can delete this report (owner or admin)
     if (report.reporter.toString() !== req.user._id.toString() && 
-        !['admin', 'healthcare_provider', 'health_worker'].includes(req.user.role)) {
+        !['admin', 'doctor', 'health_worker'].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to delete this report'
@@ -412,7 +418,7 @@ router.delete('/:id', [
 // @access  Private (Health workers, providers, admins)
 router.put('/:id/resolve', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'admin')
+  authorizeRole('doctor', 'health_worker', 'admin')
 ], async (req, res) => {
   try {
     const report = await HealthReport.findById(req.params.id);
@@ -455,7 +461,7 @@ router.put('/:id/resolve', [
 // @access  Private (Health workers, providers, admins)
 router.put('/:id/undo-resolution', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'admin')
+  authorizeRole('doctor', 'health_worker', 'admin')
 ], async (req, res) => {
   try {
     const report = await HealthReport.findById(req.params.id);
@@ -497,7 +503,7 @@ router.put('/:id/undo-resolution', [
 // @access  Private (Health workers, providers, admins)
 router.get('/stats/overview', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'ngo_worker', 'admin')
+  authorizeRole('doctor', 'health_worker', 'ngo', 'admin')
 ], async (req, res) => {
   try {
     const stats = await HealthReport.aggregate([

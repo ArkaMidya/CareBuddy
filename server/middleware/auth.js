@@ -100,8 +100,8 @@ const canAccessResource = (resourceUserId) => {
       return next();
     }
 
-    // Healthcare providers can access patient resources if they're assigned
-    if (req.user.role === 'healthcare_provider') {
+    // Health workers can access patient resources if they're assigned
+    if (req.user.role === 'health_worker') {
       // This would need to be implemented based on your assignment logic
       return next();
     }

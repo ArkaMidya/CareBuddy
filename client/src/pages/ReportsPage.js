@@ -590,50 +590,110 @@ const ReportsPage = () => {
         return (
           <Box sx={{ p: 3 }}>
             <Typography variant="h6" sx={{ mb: 3, color: 'primary.main' }}>
-              Location and Contact Information
+              Location & Community Impact
             </Typography>
-            
             <Grid container spacing={3}>
               <Grid item xs={12}>
                 <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
                   Location
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                  <Button
-                    variant="outlined"
-                    onClick={handleUseMyLocation}
-                    disabled={isLoadingLocation}
-                    startIcon={isLoadingLocation ? <CircularProgress size={20} /> : <MyLocation />}
-                    sx={{ flex: 1 }}
-                  >
-                    {isLoadingLocation ? 'Getting Location...' : 'Use My Current Location'}
-                  </Button>
-                                     <Button
-                     variant="outlined"
-                     onClick={() => setShowLocationModal(true)}
-                     startIcon={<LocationOn />}
-                     sx={{ flex: 1 }}
-                   >
-                     Search Location
-                   </Button>
+                <TextField
+                  label="Location Name"
+                  fullWidth
+                  value={newReport.location.name}
+                  onChange={async (e) => {
+                    const name = e.target.value;
+                    setNewReport(prev => ({
+                      ...prev,
+                      location: { ...prev.location, name }
+                    }));
+                    if (name.trim()) {
+                      try {
+                        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(name)}&limit=1&addressdetails=1`);
+                        const data = await response.json();
+                        if (data.length > 0) {
+                          const { lat, lon } = data[0];
+                          setNewReport(prev => ({
+                            ...prev,
+                            location: {
+                              ...prev.location,
+                              lat: parseFloat(lat),
+                              lng: parseFloat(lon),
+                              name: data[0].display_name
+                            }
+                          }));
+                        }
+                      } catch (error) {}
+                    }
+                  }}
+                  sx={{ mb: 2 }}
+                />
+                <TextField
+                  label="Street Address"
+                  fullWidth
+                  value={newReport.location.address}
+                  onChange={e => setNewReport(prev => ({ ...prev, location: { ...prev.location, address: e.target.value } }))}
+                  sx={{ mb: 2 }}
+                />
+                <TextField
+                  label="City"
+                  fullWidth
+                  value={newReport.location.city}
+                  onChange={e => setNewReport(prev => ({ ...prev, location: { ...prev.location, city: e.target.value } }))}
+                  sx={{ mb: 2 }}
+                />
+                <TextField
+                  label="State"
+                  fullWidth
+                  value={newReport.location.state}
+                  onChange={e => setNewReport(prev => ({ ...prev, location: { ...prev.location, state: e.target.value } }))}
+                  sx={{ mb: 2 }}
+                />
+                <TextField
+                  label="ZIP Code"
+                  fullWidth
+                  value={newReport.location.zipCode}
+                  onChange={e => setNewReport(prev => ({ ...prev, location: { ...prev.location, zipCode: e.target.value } }))}
+                  sx={{ mb: 2 }}
+                />
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    Select your location on the map below:
+                  </Typography>
+                  <MapPicker
+                    value={{ lat: newReport.location.lat, lng: newReport.location.lng }}
+                    onChange={(loc) => setNewReport(prev => ({
+                      ...prev,
+                      location: {
+                        ...prev.location,
+                        lat: loc.lat,
+                        lng: loc.lng,
+                        name: `Lat: ${loc.lat.toFixed(4)}, Lng: ${loc.lng.toFixed(4)}`
+                      }
+                    }))}
+                  />
                 </Box>
-
+                <TextField
+                  label="Contact Phone"
+                  fullWidth
+                  value={newReport.reporter.phone}
+                  onChange={e => setNewReport(prev => ({ ...prev, reporter: { ...prev.reporter, phone: e.target.value } }))}
+                  sx={{ mb: 2 }}
+                />
+                <TextField
+                  label="Emergency Contact"
+                  fullWidth
+                  value={newReport.reporter.emergencyContact || ''}
+                  onChange={e => setNewReport(prev => ({ ...prev, reporter: { ...prev.reporter, emergencyContact: e.target.value } }))}
+                  sx={{ mb: 2 }}
+                />
                 {newReport.location.lat && newReport.location.lng && (
                   <Alert severity="success" sx={{ mb: 2 }}>
                     <Typography variant="body2">
-                      <strong>Location set:</strong> {newReport.location.name || 
-                        `${newReport.location.lat.toFixed(4)}, ${newReport.location.lng.toFixed(4)}`}
+                      <strong>Location set:</strong> {newReport.location.name || `${newReport.location.lat.toFixed(4)}, ${newReport.location.lng.toFixed(4)}`}
                     </Typography>
                   </Alert>
                 )}
-
-                <MapPicker 
-                  value={{ lat: newReport.location.lat, lng: newReport.location.lng }} 
-                  onChange={(loc) => setNewReport(prev => ({ 
-                    ...prev, 
-                    location: { ...prev.location, lat: loc.lat, lng: loc.lng } 
-                  }))} 
-                />
                 {createErrors.location && (
                   <Typography color="error" variant="caption" sx={{ mt: 1 }}>
                     {createErrors.location}

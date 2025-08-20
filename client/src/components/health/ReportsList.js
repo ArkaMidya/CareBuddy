@@ -67,7 +67,7 @@ const ReportsList = ({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   // Check if user has admin privileges
-  const hasAdminPrivileges = ['admin', 'healthcare_provider', 'health_worker'].includes(userRole);
+  const hasAdminPrivileges = ['admin', 'doctor', 'health_worker'].includes(userRole);
 
   useEffect(() => {
     let filtered = [...reports];

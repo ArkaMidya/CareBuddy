@@ -42,6 +42,7 @@ const RegisterPage = () => {
     zipCode: '',
     licenseNo: '',
     organization: '',
+    specialization: '',
     qualification: ''
   });
   
@@ -58,12 +59,31 @@ const RegisterPage = () => {
   };
 
   const shouldShowHealthFields = () => {
-    return ['health_worker', 'healthcare_provider'].includes(formData.role);
+    return ['health_worker', 'doctor'].includes(formData.role);
   };
 
   const shouldShowNGOFields = () => {
-    return formData.role === 'ngo_worker';
+    return formData.role === 'ngo';
   };
+
+  // Flat list of medical specializations
+  const availableSpecialties = [
+    'Cardiologist',
+    'Neurologist',
+    'Pediatrician',
+    'Dermatologist',
+    'Psychiatrist',
+    'General Physician',
+    'Orthopedist',
+    'Gynecologist',
+    'Endocrinologist',
+    'Oncologist',
+    'Ophthalmologist',
+    'ENT Specialist',
+    'Urologist',
+    'Neurosurgeon',
+    'Pediatric Surgeon'
+  ];
 
   const validateForm = () => {
     const newErrors = {};
@@ -131,7 +151,7 @@ const RegisterPage = () => {
     }
     
     // Role-specific validation
-    if (['health_worker', 'healthcare_provider'].includes(formData.role)) {
+    if (['health_worker', 'doctor'].includes(formData.role)) {
       if (!formData.licenseNo.trim()) {
         newErrors.licenseNo = 'License number is required for health professionals';
       }
@@ -141,7 +161,11 @@ const RegisterPage = () => {
       if (!formData.qualification.trim()) {
         newErrors.qualification = 'Qualification is required for health professionals';
       }
-    } else if (formData.role === 'ngo_worker') {
+      // specialization is required for health professionals
+      if (!formData.specialization) {
+        newErrors.specialization = 'Please select your specialization';
+      }
+    } else if (formData.role === 'ngo') {
       if (!formData.qualification.trim()) {
         newErrors.qualification = 'Qualification is required for NGO workers';
       }
@@ -176,6 +200,7 @@ const RegisterPage = () => {
         zipCode: formData.zipCode.trim(),
         licenseNo: formData.licenseNo.trim(),
         organization: formData.organization.trim(),
+        specialization: formData.specialization,
         qualification: formData.qualification.trim()
       });
       
@@ -198,6 +223,7 @@ const RegisterPage = () => {
         zipCode: '',
         licenseNo: '',
         organization: '',
+        specialization: '',
         qualification: ''
       });
       setErrors({});
@@ -316,9 +342,9 @@ const RegisterPage = () => {
                   label="Role"
                 >
                   <MenuItem value="patient">Patient</MenuItem>
+                  <MenuItem value="doctor">Doctor</MenuItem>
                   <MenuItem value="health_worker">Health Worker</MenuItem>
-                  <MenuItem value="healthcare_provider">Healthcare Provider</MenuItem>
-                  <MenuItem value="ngo_worker">NGO Worker</MenuItem>
+                  <MenuItem value="ngo">NGO</MenuItem>
                   <MenuItem value="admin">Administrator</MenuItem>
                   <MenuItem value="user">General User</MenuItem>
                 </Select>
@@ -453,6 +479,25 @@ const RegisterPage = () => {
                   placeholder="Enter your organization/hospital name"
                   required
                 />
+              </Grid>
+            )}
+
+            {/* Specialization - shown when domain selected and role is doctor/health_worker */}
+            {shouldShowHealthFields() && availableSpecialties.length > 0 && (
+              <Grid item xs={12}>
+                <FormControl fullWidth required>
+                  <InputLabel>Specialization</InputLabel>
+                  <Select
+                    value={formData.specialization}
+                    onChange={(e) => handleInputChange('specialization', e.target.value)}
+                    label="Specialization"
+                  >
+                    <MenuItem value="">Select specialization</MenuItem>
+                    {availableSpecialties.map((s) => (
+                      <MenuItem key={s} value={s.toLowerCase()}>{s}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Grid>
             )}
 

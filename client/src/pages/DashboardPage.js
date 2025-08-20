@@ -49,7 +49,7 @@ const DashboardPage = () => {
           { title: 'Education Modules', count: 8, icon: <School />, color: 'info' },
           { title: 'Active Campaigns', count: 5, icon: <Campaign />, color: 'warning' },
         ];
-      case 'healthcare_provider':
+      case 'doctor':
         return [
           { title: 'Active Patients', count: 45, icon: <People />, color: 'primary' },
           { title: 'Scheduled Consultations', count: 12, icon: <HealthAndSafety />, color: 'success' },
@@ -63,7 +63,7 @@ const DashboardPage = () => {
           { title: 'Health Camps', count: 8, icon: <Campaign />, color: 'info' },
           { title: 'Patients Assisted', count: 156, icon: <People />, color: 'warning' },
         ];
-      case 'ngo_worker':
+      case 'ngo':
         return [
           { title: 'Active Programs', count: 12, icon: <Campaign />, color: 'primary' },
           { title: 'Volunteers', count: 89, icon: <VolunteerActivism />, color: 'success' },
@@ -91,7 +91,7 @@ const DashboardPage = () => {
     ];
 
     // Add role-specific actions
-    if (['healthcare_provider', 'health_worker', 'ngo_worker'].includes(user?.role)) {
+    if (['doctor', 'health_worker', 'ngo'].includes(user?.role)) {
       actions.push({ title: 'View Reports', path: '/reports', icon: <Report /> });
     }
 

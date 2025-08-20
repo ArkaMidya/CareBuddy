@@ -133,7 +133,7 @@ router.get('/:id', async (req, res) => {
 // @access  Private (Healthcare providers, health workers, NGO workers)
 router.post('/', [
   authenticateToken,
-  authorizeRole('healthcare_provider', 'health_worker', 'ngo_worker', 'admin'),
+  authorizeRole('health_worker', 'doctor', 'ngo', 'admin'),
   body('title').trim().isLength({ min: 5, max: 200 }).withMessage('Title must be between 5 and 200 characters'),
   body('description').trim().isLength({ min: 10 }).withMessage('Description must be at least 10 characters'),
   body('type').isIn(['hospital', 'clinic', 'pharmacy', 'laboratory', 'equipment', 'medicine', 'expertise', 'transport', 'other']).withMessage('Invalid resource type'),
