@@ -7,10 +7,11 @@ const router = express.Router();
 
 // @route   GET /api/referrals
 // @desc    Get referrals with filtering and pagination
-// @access  Private (Health workers, admins)
+// @access  Private (Health workers, admins, patients)
 router.get('/', [
   authenticateToken,
-  authorizeRole('health_worker', 'doctor', 'ngo', 'admin'),
+  // allow patients to view referrals as well
+  authorizeRole('health_worker', 'doctor', 'ngo', 'admin', 'patient'),
   query('type').optional().isIn(['specialist', 'diagnostic', 'treatment', 'follow_up', 'emergency', 'preventive']),
   query('status').optional().isIn(['pending', 'accepted', 'in_progress', 'completed', 'cancelled', 'expired']),
   query('priority').optional().isIn(['routine', 'urgent', 'emergency']),
@@ -18,6 +19,8 @@ router.get('/', [
   query('limit').optional().isInt({ min: 1, max: 100 })
 ], async (req, res) => {
   try {
+    console.log('DEBUG: GET /api/referrals called by', req.user ? `${req.user._id} (${req.user.role})` : 'anonymous', 'query=', req.query);
+    console.log('DEBUG: Authorization header present?', !!req.headers.authorization);
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -45,12 +48,15 @@ router.get('/', [
     // Filter by user role
     if (req.user.role === 'admin') {
       // Admin can see all referrals
-    } else {
+    } else if (['doctor', 'health_worker'].includes(req.user.role)) {
       // Healthcare providers can see referrals they made or are assigned to
       query.$or = [
         { referringProvider: req.user._id },
         { referredToProvider: req.user._id }
       ];
+    } else if (req.user.role === 'patient') {
+      // Patients can see referrals where they are the patient
+      query.patient = req.user._id;
     }
 
     const referrals = await Referral.find(query)

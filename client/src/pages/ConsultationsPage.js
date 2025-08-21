@@ -19,6 +19,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  useTheme,
+  alpha,
 } from '@mui/material';
 import { VideoCall, CalendarToday } from '@mui/icons-material';
 import consultationService from '../services/consultationService';
@@ -27,6 +29,7 @@ import CountdownTimer from '../components/common/CountdownTimer';
 import { useNotification } from '../contexts/NotificationContext';
 import { io as ioClient } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const ConsultationsPage = () => {
   const [doctors, setDoctors] = useState([]);
@@ -52,6 +55,10 @@ const ConsultationsPage = () => {
   const notify = useNotification();
   const { user } = useAuth();
   const role = user?.role || localStorage.getItem('role');
+  const navigate = useNavigate();
+
+  // Only consultation-related notifications for this page
+  const consultNotifications = (notify.notifications || []).filter(n => n.type && n.type.startsWith('consultation'));
 
   const generateObjectId = () => {
     const hex = '0123456789abcdef';
@@ -114,15 +121,31 @@ const ConsultationsPage = () => {
       // always refresh consultations (server will filter by authenticated user)
       fetchConsultations();
       if (role === 'doctor') { // Only notify if the current user is a doctor
-        notify.showInfo('New consultation request received');
+        const payload = consultation?.consultation || consultation;
+        const patient = consultation?.patient || payload?.patient || (payload && payload.data && payload.data.patient);
+        const patientName = patient ? `${patient.firstName || ''} ${patient.lastName || ''}`.trim() || patient.email : 'A patient';
+        const message = `${patientName} requested a consultation`;
+        notify.showInfo(message);
+        try {
+          notify.addNotification({ id: payload?._id || payload?.id || `consult-${Date.now()}`, type: 'consultation:requested', message, data: payload, createdAt: new Date().toISOString(), read: false });
+        } catch (e) { /* ignore */ }
       }
     });
 
-    socket.on('consultation:responded', (consultation) => {
-      console.log('Received consultation:responded', consultation);
+    socket.on('consultation:responded', (payload) => {
+      console.log('Received consultation:responded', payload);
       fetchConsultations();
       if (role === 'patient') {
-        notify.showInfo('Your consultation request was updated');
+        // payload may be either the consultation object or { consultation, action, provider, message }
+        const message = payload?.message
+          || (payload?.action && payload?.provider ? (
+            `${(payload.provider.firstName || payload.provider.email || 'Provider')} ${payload.action === 'accept' ? 'accepted' : payload.action === 'deny' ? 'denied' : 'updated'} your consultation`
+          ) : `Your consultation request was updated`);
+        notify.showInfo(message);
+        try {
+          const consult = payload?.consultation || payload;
+          notify.addNotification({ id: consult?._id || consult?.id || `consultresp-${Date.now()}`, type: 'consultation:responded', message, data: payload, createdAt: new Date().toISOString(), read: false });
+        } catch (e) { /* ignore */ }
       }
     });
 

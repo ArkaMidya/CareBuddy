@@ -248,6 +248,14 @@ router.post('/', [
 
     await campaignDoc.save();
 
+    // notify all connected users about new campaign
+    try {
+      const io = req.app.get('io');
+      if (io) io.emit('campaign:created', campaignDoc);
+    } catch (e) {
+      console.error('Failed to emit campaign:created', e);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Campaign created successfully',

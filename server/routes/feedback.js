@@ -7,10 +7,11 @@ const router = express.Router();
 
 // @route   GET /api/feedback
 // @desc    Get feedback with filtering and pagination
-// @access  Private (Healthcare providers, admins)
+// @access  Private (Healthcare providers, admins, patients)
 router.get('/', [
   authenticateToken,
-  authorizeRole('health_worker', 'doctor', 'admin'),
+  // allow patients to view feedback as well
+  authorizeRole('health_worker', 'doctor', 'admin', 'patient'),
   query('type').optional().isIn(['care_quality', 'wait_time', 'communication', 'facility', 'medication', 'follow_up', 'general']),
   query('status').optional().isIn(['pending', 'reviewed', 'addressed', 'resolved', 'closed']),
   query('priority').optional().isIn(['low', 'medium', 'high', 'critical']),
@@ -18,6 +19,8 @@ router.get('/', [
   query('limit').optional().isInt({ min: 1, max: 100 })
 ], async (req, res) => {
   try {
+    console.log('DEBUG: GET /api/feedback called by', req.user ? `${req.user._id} (${req.user.role})` : 'anonymous', 'query=', req.query);
+    console.log('DEBUG: Authorization header present?', !!req.headers.authorization);
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -42,8 +45,9 @@ router.get('/', [
     if (status) query.status = status;
     if (priority) query.priority = priority;
 
-    // Filter by healthcare provider if not admin
-    if (req.user.role !== 'admin') {
+    // If user is a healthcare provider (doctor/health_worker), only show feedback for them
+    // Admins and patients can see all feedback
+    if (['doctor', 'health_worker'].includes(req.user.role)) {
       query.healthcareProvider = req.user._id;
     }
 

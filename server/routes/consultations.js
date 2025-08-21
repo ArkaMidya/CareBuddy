@@ -128,13 +128,16 @@ router.post('/', [
     });
     await consultation.save();
 
-    // notify provider via socket
+    // notify provider via socket (include patient info and friendly message)
     try {
       const io = req.app.get('io');
-      const payload = await consultation.populate('patient', 'firstName lastName email');
+      const populated = await consultation.populate('patient', 'firstName lastName email');
+      const patient = populated.patient || {};
+      const patientName = `${patient.firstName || ''} ${patient.lastName || ''}`.trim() || patient.email || 'A patient';
+      const message = `${patientName} requested a consultation`;
       if (io) {
         console.log('Emitting consultation:requested to provider', providerId);
-        io.to(String(providerId)).emit('consultation:requested', payload);
+        io.to(String(providerId)).emit('consultation:requested', { consultation: populated, patient, message });
       }
     } catch (e) {
       console.error('Socket emit error:', e);
@@ -177,11 +180,19 @@ router.post('/:id/respond', [
     if (action === 'completed') consultation.status = 'completed'; // Handle 'completed' action
     await consultation.save();
 
-    // notify patient
+    // populate provider info for message
+    const providerInfo = await User.findById(req.user._id).select('firstName lastName email');
+    const providerName = providerInfo ? `${providerInfo.firstName || ''} ${providerInfo.lastName || ''}`.trim() || providerInfo.email : 'Provider';
+
+    // notify patient with action and provider name
     try {
       const io = req.app.get('io');
-      if (io) io.to(String(consultation.patient._id)).emit('consultation:responded', consultation);
-    } catch (e) {}
+      const payload = await consultation.populate('patient', 'firstName lastName email');
+      const message = action === 'accept' ? `${providerName} accepted your consultation` : action === 'deny' ? `${providerName} denied your consultation` : `${providerName} updated your consultation`;
+      if (io) io.to(String(consultation.patient._id)).emit('consultation:responded', { consultation: payload, action, provider: providerInfo, message });
+    } catch (e) {
+      console.error('Socket emit error:', e);
+    }
 
     return res.json({ success: true, message: `Consultation ${action}ed`, data: { consultation } });
   } catch (e) {

@@ -35,6 +35,8 @@ export const feedbackService = {
         }
       });
 
+      // Debug: log token presence before request
+      try { console.log('DEBUG: feedbackService.getFeedback token present?', !!localStorage.getItem('token')); } catch (e) {}
       const response = await api.get(`/feedback?${params.toString()}`);
       return response.data;
     } catch (error) {

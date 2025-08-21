@@ -47,10 +47,8 @@ router.get('/', [
     if (status) query.status = status;
     if (priority) query.priority = priority;
 
-   // If patient, only allow their own reports
-   if (req.user.role === 'patient') {
-     query.reporter = req.user._id;
-   } else if (!['health_worker', 'doctor', 'ngo', 'admin'].includes(req.user.role)) {
+   // Allow authenticated users to view reports. Patients can now view all reports.
+   if (!['health_worker', 'doctor', 'ngo', 'admin', 'patient'].includes(req.user.role)) {
      return res.status(403).json({ success: false, message: 'Not authorized to view reports' });
    }
 
@@ -126,6 +124,14 @@ router.post('/', [
 
     // Populate reporter info
     await report.populate('reporter', 'firstName lastName email phone');
+
+    // notify all connected users about new report
+    try {
+      const io = req.app.get('io');
+      if (io) io.emit('report:created', report);
+    } catch (e) {
+      console.error('Failed to emit report:created', e);
+    }
 
     res.status(201).json({
       success: true,
