@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -23,6 +23,7 @@ import {
 import { VideoCall, CalendarToday } from '@mui/icons-material';
 import consultationService from '../services/consultationService';
 import userService from '../services/userService';
+import CountdownTimer from '../components/common/CountdownTimer';
 import { useNotification } from '../contexts/NotificationContext';
 import { io as ioClient } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
@@ -35,9 +36,18 @@ const ConsultationsPage = () => {
   const [consultations, setConsultations] = useState([]);
   const [status, setStatus] = useState('');
   const [openBook, setOpenBook] = useState(false);
-  const [form, setForm] = useState({ providerId: '', scheduledAt: '', type: 'video', notes: '' });
+  const [form, setForm] = useState({ providerId: '', scheduledAt: '', scheduledEnd: '', type: 'video', notes: '' });
   const [callInfo, setCallInfo] = useState(null); // { id, type }
   const [openCall, setOpenCall] = useState(false);
+  const [tick, setTick] = useState(0); // used to force re-render when timers expire
+
+  const nextUpcomingId = useMemo(() => {
+    const now = new Date();
+    const upcoming = consultations
+      .filter((c) => c.status === 'scheduled' && c.scheduledAt && new Date(c.scheduledAt) > now)
+      .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
+    return upcoming.length > 0 ? (upcoming[0]._id || upcoming[0].id) : null;
+  }, [consultations, tick]);
 
   const notify = useNotification();
   const { user } = useAuth();
@@ -67,7 +77,17 @@ const ConsultationsPage = () => {
         params.status = status;
       }
       const { data } = await consultationService.list(params, token);
-      setConsultations(data?.data?.consultations || []);
+      const consults = data?.data?.consultations || [];
+      setConsultations(consults);
+
+      // Auto-mark consultations as completed if their scheduledEnd has passed
+      const toComplete = consults.filter(c => c.status === 'scheduled' && (c.scheduledEnd ? new Date(c.scheduledEnd) : null) && new Date(c.scheduledEnd) < new Date());
+      if (toComplete.length > 0) {
+        await Promise.all(toComplete.map(c => consultationService.respond(c._id || c.id, 'completed', token).catch(() => null)));
+        // refresh list
+        const { data: refreshed } = await consultationService.list(params, token);
+        setConsultations(refreshed?.data?.consultations || []);
+      }
     } catch (e) {
       // noop
     } finally {
@@ -110,6 +130,12 @@ const ConsultationsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, specializationFilter]);
 
+  // periodic tick to refresh timers and re-evaluate Join visibility
+  useEffect(() => {
+    const iv = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(iv);
+  }, []);
+
   const handleBook = async () => {
     // Ensure required fields and server validation formats
     let providerId = (form.providerId || '').trim();
@@ -118,21 +144,30 @@ const ConsultationsPage = () => {
       return;
     }
 
-    if (!form.scheduledAt) {
-      notify.showError('Please select a date and time for the consultation.');
+    if (!form.scheduledAt || !form.scheduledEnd) {
+      notify.showError('Please provide both start and end time for the consultation.');
       return;
     }
 
-    const scheduledAtIso = new Date(form.scheduledAt).toISOString(); // Ensure it's a valid ISO string
+    const startDate = new Date(form.scheduledAt);
+    const endDate = new Date(form.scheduledEnd);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      notify.showError('Please provide valid start and end times.');
+      return;
+    }
+
+    if (endDate <= startDate) {
+      notify.showError('End time must be after start time.');
+      return;
+    }
+
+    const scheduledAtIso = startDate.toISOString(); // Ensure it's a valid ISO string
 
     try {
       setLoading(true);
-      const { data } = await consultationService.request({
-        providerId,
-        scheduledAt: scheduledAtIso,
-        type: form.type,
-        notes: form.notes,
-      }, token);
+      const payload = { providerId, scheduledAt: scheduledAtIso, type: form.type, notes: form.notes };
+      if (form.scheduledEnd) payload.scheduledEnd = new Date(form.scheduledEnd).toISOString();
+      const { data } = await consultationService.request(payload, token);
 
       setOpenBook(false);
       setForm({ providerId: '', scheduledAt: '', type: 'video', notes: '' });
@@ -175,33 +210,43 @@ const ConsultationsPage = () => {
         <Grid container spacing={2} sx={{ mb: 2 }}>
           <Grid item xs={12} sm={6} md={4}>
             <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
-              <Select label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <InputLabel shrink>Status</InputLabel>
+              <Select
+                label="Status"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                displayEmpty
+                renderValue={(selected) => (selected === '' ? 'All' : selected)}
+              >
                 <MenuItem value="">All</MenuItem>
                 {statuses.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <FormControl fullWidth>
-              <InputLabel>Specialization</InputLabel>
-              <Select
-                label="Specialization"
-                value={specializationFilter}
-                onChange={(e) => setSpecializationFilter(e.target.value)}
-              >
-                <MenuItem value="">All</MenuItem>
-                {Array.from(new Set(doctors.flatMap(d => (d.providerInfo?.specialization || []).map(s => s))))
-                  .filter(Boolean)
-                  .map((s) => (
-                    <MenuItem key={s} value={s}>{s}</MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={8} sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-            <Button variant="contained" onClick={() => setOpenBook(true)}>Book Consultation</Button>
-          </Grid>
+          {role !== 'doctor' && (
+            <Grid item xs={12} sm={6} md={4}>
+              <FormControl fullWidth>
+                <InputLabel>Specialization</InputLabel>
+                <Select
+                  label="Specialization"
+                  value={specializationFilter}
+                  onChange={(e) => setSpecializationFilter(e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  {Array.from(new Set(doctors.flatMap(d => (d.providerInfo?.specialization || []).map(s => s))))
+                    .filter(Boolean)
+                    .map((s) => (
+                      <MenuItem key={s} value={s}>{s}</MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+            </Grid>
+          )}
+          {role !== 'doctor' && (
+            <Grid item xs={12} sm={6} md={8} sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <Button variant="contained" onClick={() => setOpenBook(true)}>Book Consultation</Button>
+            </Grid>
+          )}
         </Grid>
 
         {loading && <LinearProgress sx={{ mb: 2 }} />}
@@ -227,6 +272,7 @@ const ConsultationsPage = () => {
                       <CalendarToday fontSize="small" />
                       <Typography variant="caption">{c.scheduledAt ? new Date(c.scheduledAt).toLocaleString() : 'Not scheduled'}</Typography>
                     </Box>
+                    {/* Countdown & Join logic (only render per-card timer in actions area) */}
                   </CardContent>
                   <CardActions>
                     {c.status === 'requested' && (role === 'health_worker' || role === 'doctor') && (
@@ -247,30 +293,56 @@ const ConsultationsPage = () => {
                         }}>Deny</Button>
                       </>
                     )}
-                    {c.status === 'scheduled' && (c.type === 'video' || c.type === 'audio') && (
-                      c.scheduledAt && new Date(c.scheduledAt) > new Date() ? (
-                        <Button size="small" onClick={() => { setCallInfo({ id: c._id || c.id, type: c.type }); setOpenCall(true); }}>Join</Button>
-                      ) : (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="caption" color="text.secondary">Time Over</Typography>
-                          {(role === 'health_worker' || role === 'doctor' || role === 'admin' || role === 'ngo' || role === 'patient') && (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color="info"
-                              onClick={async () => {
-                                try {
-                                  await consultationService.respond(c._id || c.id, 'completed', token); // Update status to completed
-                                  notify.showSuccess('Consultation dismissed.');
-                                  fetchConsultations(); // Refresh list
-                                } catch (e) {
-                                  notify.showError('Failed to dismiss consultation.');
-                                }
-                              }}
-                            >Dismiss</Button>
-                          )}
-                        </Box>
-                      )
+                    {(c.type === 'video' || c.type === 'audio') && (
+                      (() => {
+                        const now = new Date();
+                        const start = c.scheduledAt ? new Date(c.scheduledAt) : null;
+                        const end = c.scheduledEnd ? new Date(c.scheduledEnd) : (start ? new Date(start.getTime() + 30 * 60 * 1000) : null);
+                        if (!start || !end) return null;
+
+                        if (now < start) {
+                          // before start: show countdown only for the next upcoming consultation
+                          if ((c._id || c.id) === nextUpcomingId) {
+                            return (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <CountdownTimer deadline={start} label="Starts in" onExpired={() => setTick(t => t + 1)} />
+                              </Box>
+                            );
+                          }
+                          return null;
+                        }
+
+                        if (now >= start && now <= end) {
+                          // within meeting window: show Join only if status not completed
+                          if (c.status !== 'completed') {
+                            return <Button size="small" onClick={() => { setCallInfo({ id: c._id || c.id, type: c.type }); setOpenCall(true); }}>Join</Button>;
+                          }
+                          return null;
+                        }
+
+                        // after end: show Time Over (and allow Dismiss to mark completed if not already)
+                        return (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Time Over</Typography>
+                            {(c.status !== 'completed') && (role === 'health_worker' || role === 'doctor' || role === 'admin' || role === 'ngo' || role === 'patient') && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="info"
+                                onClick={async () => {
+                                  try {
+                                    await consultationService.respond(c._id || c.id, 'completed', token); // Update status to completed
+                                    notify.showSuccess('Consultation dismissed.');
+                                    fetchConsultations(); // Refresh list
+                                  } catch (e) {
+                                    notify.showError('Failed to dismiss consultation.');
+                                  }
+                                }}
+                              >Dismiss</Button>
+                            )}
+                          </Box>
+                        );
+                      })()
                     )}
                   </CardActions>
                 </Card>
@@ -333,11 +405,21 @@ const ConsultationsPage = () => {
               <Grid item xs={12} sm={6}>
                 <TextField
                   type="datetime-local"
-                  label="Date & Time"
+                  label="Start Date & Time"
                   InputLabelProps={{ shrink: true }}
                   fullWidth
                   value={form.scheduledAt}
                   onChange={(e) => setForm((f) => ({ ...f, scheduledAt: e.target.value }))}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  type="datetime-local"
+                  label="End Date & Time"
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                  value={form.scheduledEnd}
+                  onChange={(e) => setForm((f) => ({ ...f, scheduledEnd: e.target.value }))}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>

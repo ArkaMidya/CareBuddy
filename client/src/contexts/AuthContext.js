@@ -58,13 +58,9 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setError(null);
-      const response = await authService.register(userData);
-      const { user: newUser, token } = response.data.data;
-
-      localStorage.setItem('token', token);
-      localStorage.setItem('role', newUser.role);
-      setUser(newUser);
-      
+      // Register the user but do not auto-login. The API may return a token but
+      // we will not store it here. User should sign in explicitly after registration.
+      await authService.register(userData);
       return { success: true };
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Registration failed';

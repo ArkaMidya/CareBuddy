@@ -27,13 +27,17 @@ router.get('/', [
 
     const { status, page = 1, limit = 20 } = req.query;
 
+    // Auto-complete any scheduled consultations whose end time has passed
+    try {
+      await Consultation.updateMany({ status: 'scheduled', scheduledEnd: { $lt: new Date() } }, { $set: { status: 'completed' } });
+    } catch (e) {
+      console.error('Auto-complete update failed:', e);
+    }
+
     // Build query based on user role
     const query = {};
     if (status) {
       query.status = status;
-    } else {
-      // Default: exclude 'completed' and 'denied' statuses from the main view
-      query.status = { $nin: ['completed', 'denied'] };
     }
 
     // Filter by user role (doctors and health workers see provider-side)
@@ -86,7 +90,8 @@ router.get('/', [
 router.post('/', [
   authenticateToken,
   body('providerId').isMongoId().withMessage('Valid provider ID is required'),
-  body('scheduledAt').isISO8601().withMessage('Valid date is required'),
+  body('scheduledAt').isISO8601().withMessage('Valid start date is required'),
+  body('scheduledEnd').isISO8601().withMessage('Valid end date is required'),
   body('type').isIn(['video', 'audio', 'chat']).withMessage('Invalid consultation type'),
   body('notes').optional().trim()
 ], async (req, res) => {
@@ -100,13 +105,21 @@ router.post('/', [
       });
     }
 
-    const { providerId, scheduledAt, type, notes } = req.body;
+    const { providerId, scheduledAt, scheduledEnd, type, notes } = req.body;
+
+    // Ensure scheduledEnd is after scheduledAt
+    const start = new Date(scheduledAt);
+    const end = new Date(scheduledEnd);
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
+      return res.status(400).json({ success: false, message: 'End time must be after start time' });
+    }
 
     // Create consultation request
     const consultation = new Consultation({
       patient: req.user._id,
       provider: providerId,
       scheduledAt: new Date(scheduledAt),
+      scheduledEnd: scheduledEnd ? new Date(scheduledEnd) : undefined,
       type,
       notes: notes || '',
       status: 'requested',

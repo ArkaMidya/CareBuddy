@@ -3,7 +3,7 @@ import { Box, Typography, Chip } from '@mui/material';
 
 const pad = (n) => String(n).padStart(2, '0');
 
-const CountdownTimer = ({ deadline, onExpired }) => {
+const CountdownTimer = ({ deadline, onExpired, label = 'Starts in' }) => {
   const [timeLeft, setTimeLeft] = useState(null);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ const CountdownTimer = ({ deadline, onExpired }) => {
 
   return (
     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-      <Typography variant="caption" color="text.secondary">Registration ends in</Typography>
+      <Typography variant="caption" color="text.secondary">{label}</Typography>
       <Chip label={`${days}d ${pad(hours)}h:${pad(minutes)}m:${pad(seconds)}s`} color="primary" />
     </Box>
   );

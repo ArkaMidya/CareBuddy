@@ -23,7 +23,7 @@ import {
   HealthAndSafety,
   ArrowForward,
 } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -296,7 +296,7 @@ const LoginPage = () => {
                   Don't have an account? Join our health ecosystem today.
                 </Typography>
                 <Button
-                  component={Link}
+                  component={RouterLink}
                   to="/register"
                   variant="outlined"
                   fullWidth
