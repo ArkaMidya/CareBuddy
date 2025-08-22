@@ -101,6 +101,10 @@ import { useNotification } from '../contexts/NotificationContext';
   const [showReport, setShowReport] = useState(false);
   const [scheduleEntries, setScheduleEntries] = useState([]);
   const [scheduleForm, setScheduleForm] = useState({ moduleId: '', date: '', time: '' });
+  const [moduleRatings, setModuleRatings] = useState({});
+  const [currentModuleRating, setCurrentModuleRating] = useState(0);
+  const [showRatingPrompt, setShowRatingPrompt] = useState(false);
+  const [ratingValueInput, setRatingValueInput] = useState(null);
 
   // Progress report helpers
   const getCompletedCountForModule = (module) => {
@@ -148,6 +152,49 @@ import { useNotification } from '../contexts/NotificationContext';
       if (savedSchedule) setScheduleEntries(JSON.parse(savedSchedule));
     } catch {}
   }, []);
+
+  // load persisted module ratings
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('educationModuleRatings');
+      if (saved) setModuleRatings(JSON.parse(saved));
+    } catch (e) {}
+  }, []);
+
+  // update displayed current module rating when ratings change or selected module changes
+  useEffect(() => {
+    try {
+      if (selectedModule) {
+        setCurrentModuleRating(getAverageRating(selectedModule.id, selectedModule.rating));
+      }
+    } catch (e) {}
+  }, [moduleRatings, selectedModule]);
+
+  const getAverageRating = (moduleId, fallback) => {
+    const arr = moduleRatings && moduleRatings[moduleId];
+    if (!arr || !Array.isArray(arr) || arr.length === 0) return fallback || 0;
+    const sum = arr.reduce((s, v) => s + Number(v || 0), 0);
+    return Math.round((sum / arr.length) * 10) / 10; // one decimal
+  };
+
+  const getRatingCount = (moduleId) => {
+    const arr = moduleRatings && moduleRatings[moduleId];
+    return arr && Array.isArray(arr) ? arr.length : 0;
+  };
+
+  const submitModuleRating = (moduleId, rating) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('educationModuleRatings') || '{}');
+      const arr = Array.isArray(existing[moduleId]) ? existing[moduleId].slice() : [];
+      arr.push(Number(rating));
+      existing[moduleId] = arr;
+      localStorage.setItem('educationModuleRatings', JSON.stringify(existing));
+      setModuleRatings(existing);
+      showSuccess('Thank you for rating');
+    } catch (e) {
+      showError('Could not save rating');
+    }
+  };
 
   // Persist progress and bookmarks
   useEffect(() => {
@@ -500,6 +547,8 @@ import { useNotification } from '../contexts/NotificationContext';
     }
 
     setSelectedModule(module);
+    // set displayed rating for this module
+    try { setCurrentModuleRating(getAverageRating(module.id, module.rating)); } catch (e) {}
     setSelectedLesson(lesson);
     setFallbackUrl(lessonUrl);
     setVideoUnavailable(false);
@@ -866,6 +915,13 @@ import { useNotification } from '../contexts/NotificationContext';
       [`${selectedModule.id}-${lesson.id}`]: true
     }));
     showSuccess('Lesson marked as completed');
+    try {
+      if (lesson.type === 'video') {
+        // prompt user to rate the module after completing a video
+        setRatingValueInput(null);
+        setShowRatingPrompt(true);
+      }
+    } catch (e) {}
   };
 
   const handleBookmark = (moduleId) => {
@@ -1055,9 +1111,10 @@ import { useNotification } from '../contexts/NotificationContext';
                 {module.title}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Rating value={module.rating} readOnly size="small" />
+                {/* if no ratings, show empty stars (value=0) */}
+                <Rating value={getRatingCount(module.id) === 0 ? 0 : getAverageRating(module.id, module.rating)} readOnly size="small" />
                 <Typography variant="body2" color="text.secondary">
-                  ({module.rating})
+                  {getRatingCount(module.id) === 0 ? '(0 . 1 rating)' : `(${getAverageRating(module.id, module.rating)} • ${getRatingCount(module.id)} ratings)`}
                 </Typography>
               </Box>
             </Box>
@@ -1113,6 +1170,15 @@ import { useNotification } from '../contexts/NotificationContext';
           >
             Start Learning
           </Button>
+          <Box sx={{ ml: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Rating
+              name={`rate-module-${module.id}`}
+              value={getAverageRating(module.id, module.rating)}
+              precision={1}
+              onChange={(_, value) => submitModuleRating(module.id, value)}
+              size="small"
+            />
+          </Box>
           <Button 
             size="small" 
             variant="outlined"
@@ -1570,6 +1636,26 @@ import { useNotification } from '../contexts/NotificationContext';
                 </Box>
                 {/* completion is automatic after full video playback; no manual button */}
               </Box>
+              {showRatingPrompt && selectedModule && (
+                <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Typography variant="subtitle1">Rate this module:</Typography>
+                  <Rating
+                    name="post-video-rating"
+                    value={ratingValueInput || getAverageRating(selectedModule.id, selectedModule.rating)}
+                    onChange={(_, val) => setRatingValueInput(val)}
+                  />
+                  <Button
+                    variant="contained"
+                    onClick={() => {
+                      if (ratingValueInput) submitModuleRating(selectedModule.id, ratingValueInput);
+                      setShowRatingPrompt(false);
+                    }}
+                  >
+                    Submit
+                  </Button>
+                  <Button variant="text" onClick={() => setShowRatingPrompt(false)}>Skip</Button>
+                </Box>
+              )}
             </Box>
           </DialogContent>
         </Dialog>
