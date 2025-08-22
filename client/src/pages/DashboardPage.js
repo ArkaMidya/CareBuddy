@@ -47,7 +47,7 @@ const DashboardPage = () => {
           { title: 'Health Reports', count: 3, icon: <Report />, color: 'primary' },
           { title: 'Consultations', count: 2, icon: <HealthAndSafety />, color: 'success' },
           { title: 'Education Modules', count: 8, icon: <School />, color: 'info' },
-          { title: 'Active Campaigns', count: 5, icon: <Campaign />, color: 'warning' },
+          { title: 'Total Campaigns', count: 5, icon: <Campaign />, color: 'warning' },
         ];
       case 'doctor':
         return [
@@ -75,7 +75,7 @@ const DashboardPage = () => {
           { title: 'Total Users', count: 1247, icon: <People />, color: 'primary' },
           { title: 'Active Reports', count: 89, icon: <Report />, color: 'success' },
           { title: 'Health Resources', count: 234, icon: <LocalHospital />, color: 'info' },
-          { title: 'Active Campaigns', count: 23, icon: <Campaign />, color: 'warning' },
+          { title: 'Total Campaigns', count: 23, icon: <Campaign />, color: 'warning' },
         ];
       default:
         return [];

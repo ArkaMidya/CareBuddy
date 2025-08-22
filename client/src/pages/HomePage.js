@@ -190,6 +190,13 @@ const HomePage = () => {
     },
   ];
 
+  const partners = [
+    { name: 'NGO One', logo: '/p2.jpg', url: 'https://example.org' },
+    { name: 'NGO Two', logo: '/tt.jpg', url: 'https://example.org' },
+    { name: 'NGO Three', logo: '/kk.webp', url: 'https://example.org' },
+    { name: 'NGO Four', logo: '/ngo.webp', url: 'https://example.org' },
+  ];
+
   return (
     <Box sx={{ 
       backgroundColor: theme.palette.background.default, 
@@ -206,7 +213,7 @@ const HomePage = () => {
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
-        opacity: 0.07, // restored opacity
+        opacity: 1, // increased opacity for better visibility
         zIndex: 0,
       },
     }}>
@@ -557,6 +564,46 @@ const HomePage = () => {
                   {benefit.description}
                 </Typography>
               </Card>
+            </Grid>
+          ))}
+        </Grid>
+      </Container>
+
+      {/* Partners Section */}
+      <Container maxWidth="lg" sx={{ mb: 6 }}>
+        <Box sx={{ textAlign: 'center', mb: 3 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+            Our Partners
+          </Typography>
+          <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 2 }}>
+            We collaborate with NGOs and community organizations to reach more people.
+          </Typography>
+        </Box>
+
+        <Grid container spacing={2} alignItems="center" justifyContent="center">
+          {partners.map((p, i) => (
+            <Grid item xs={6} sm={4} md={2} key={i} sx={{ textAlign: 'center' }}>
+              <Box
+                component="a"
+                href={p.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  p: 1,
+                  transition: 'transform 0.2s',
+                  '&:hover': { transform: 'translateY(-4px)' },
+                }}
+              >
+                <Box
+                  component="img"
+                  src={p.logo}
+                  alt={p.name}
+                  sx={{ height: { xs: 80, sm: 96, md: 120 }, width: { xs: 120, sm: 160, md: 180 }, objectFit: 'contain', filter: 'grayscale(0.1)' }}
+                />
+              </Box>
             </Grid>
           ))}
         </Grid>
