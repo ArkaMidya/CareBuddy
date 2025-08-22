@@ -179,7 +179,7 @@ import { useNotification } from '../contexts/NotificationContext';
       lessons: 6,
       completed: 0,
       image: '🍎',
-      language: ['en', 'es', 'fr'],
+      language: ['en', 'es', 'fr', 'bn', 'hi'],
       lessons: [
         {
           id: 1,
@@ -187,7 +187,11 @@ import { useNotification } from '../contexts/NotificationContext';
           type: 'video',
           duration: '8 min',
           content: 'Learn about proteins, carbohydrates, and fats.',
-          videoUrl: 'https://youtu.be/inEPlZZ_SfA?si=aEEjKucSl6KPdRrF',
+          videoUrl: {
+            en: 'https://youtu.be/inEPlZZ_SfA?si=aEEjKucSl6KPdRrF',
+            bn: 'https://youtu.be/YMH3wXMp9Fs?si=B9Q9Pm57Y0jYbgA1',
+            hi: 'https://youtu.be/8Z1LaXG93X8?si=QIEsRNyQy9khOGMD'
+          },
           completed: false
         },
         {
@@ -233,7 +237,7 @@ import { useNotification } from '../contexts/NotificationContext';
       lessons: 5,
       completed: 0,
       image: '🧠',
-      language: ['en', 'es'],
+      language: ['en', 'es', 'bn', 'hi'],
       lessons: [
         {
           id: 1,
@@ -241,7 +245,11 @@ import { useNotification } from '../contexts/NotificationContext';
           type: 'video',
           duration: '10 min',
           content: 'Learn about stress triggers and responses.',
-          videoUrl: 'https://www.youtube.com/watch?v=gmwiJ6ghLIM',
+          videoUrl: {
+            en: 'https://www.youtube.com/watch?v=gmwiJ6ghLIM',
+            hi: 'https://youtu.be/Nlz8yKG0ySU?si=ZJv7nOvxNRJ83G15',
+            bn: 'https://youtu.be/jrpB5kxKYbg?si=9FB6Ic1yNpnxYf_l'
+          },
           completed: false
         },
         {
@@ -279,17 +287,9 @@ import { useNotification } from '../contexts/NotificationContext';
       lessons: 4,
       completed: 0,
       image: '💪',
-      language: ['en', 'fr'],
+      language: ['en', 'fr', 'bn', 'hi'],
       lessons: [
-        {
-          id: 1,
-          title: 'Warm-up and Stretching',
-          type: 'video',
-          duration: '8 min',
-          content: 'Proper warm-up techniques for exercise.',
-          videoUrl: 'https://www.youtube.com/watch?v=j6Z8I47v9wE',
-          completed: false
-        },
+        // Warm-up lesson removed per update
         {
           id: 2,
           title: 'Cardio Exercises',
@@ -304,7 +304,11 @@ import { useNotification } from '../contexts/NotificationContext';
           type: 'video',
           duration: '15 min',
           content: 'Basic strength training exercises.',
-          videoUrl: 'https://www.youtube.com/watch?v=U0bhE67HuDY',
+          videoUrl: {
+            en: 'https://www.youtube.com/watch?v=U0bhE67HuDY',
+            bn: 'https://youtu.be/awWnsm2WDy8?si=bEIEbSqLbtXbhz4b',
+            hi: 'https://youtu.be/XLeqsNKyYbI?si=156LrITwHaR6DYcM'
+          },
           completed: false
         }
       ]
@@ -320,7 +324,7 @@ import { useNotification } from '../contexts/NotificationContext';
       lessons: 3,
       completed: 0,
       image: '🧼',
-      language: ['en', 'es', 'fr', 'ar'],
+      language: ['en', 'es', 'fr', 'ar', 'bn', 'hi'],
       lessons: [
         {
           id: 1,
@@ -328,7 +332,11 @@ import { useNotification } from '../contexts/NotificationContext';
           type: 'video',
           duration: '5 min',
           content: 'Proper hand washing for disease prevention.',
-          videoUrl: 'https://youtu.be/SDNzBYPosT8?si=1fd__QExAVPbpgnB',
+          videoUrl: {
+            en: 'https://youtu.be/SDNzBYPosT8?si=1fd__QExAVPbpgnB',
+            bn: 'https://youtu.be/aoeNDQHG3F0?si=-f5wNPRTv26uD4-e',
+            hi: 'https://youtu.be/9bPCBYN34xE?si=gTVRjgIK6dRKmynm'
+          },
           completed: false
         },
         {
@@ -358,7 +366,7 @@ import { useNotification } from '../contexts/NotificationContext';
       lessons: 7,
       completed: 0,
       image: '👶',
-      language: ['en', 'es'],
+      language: ['en', 'es', 'bn', 'hi'],
       lessons: [
         {
           id: 1,
@@ -380,7 +388,11 @@ import { useNotification } from '../contexts/NotificationContext';
           type: 'video',
           duration: '20 min',
           content: 'Essential care during pregnancy.',
-          videoUrl: 'https://youtu.be/FXXAF_B7vN0?si=JyRGEbTjoz9cOST1',
+          videoUrl: {
+            en: 'https://youtu.be/FXXAF_B7vN0?si=JyRGEbTjoz9cOST1',
+            bn: 'https://youtu.be/exb-WSgjQpU?si=NZsAjYlQAzp82g5b',
+            hi: 'https://www.youtube.com/live/SPfv9S0zsxk?si=dPmPVPa3IQjq2Lrp'
+          },
           completed: false
         }
       ]
@@ -396,7 +408,7 @@ import { useNotification } from '../contexts/NotificationContext';
       lessons: 8,
       completed: 0,
       image: '🩹',
-      language: ['en', 'es', 'fr'],
+      language: ['en', 'es', 'fr', 'bn', 'hi'],
       lessons: [
         {
           id: 1,
@@ -405,7 +417,11 @@ import { useNotification } from '../contexts/NotificationContext';
           duration: '4 min 3 sec',
           content: 'Learn cardiopulmonary resuscitation.',
           // use direct embed URL for reliable embedding
-          videoUrl: 'https://youtu.be/hizBdM1Ob68?si=nnrJ1pUz7kvSzMKl',
+          videoUrl: {
+            en: 'https://youtu.be/hizBdM1Ob68?si=nnrJ1pUz7kvSzMKl',
+            bn: 'https://youtu.be/3h5wSUrUv2o?si=Y-fXofU4XPXFeMyl',
+            hi: 'https://youtu.be/IPgb0j1S4Eo?si=_wloHrgUPbxt6Gdz'
+          },
           completed: false
         },
         {
@@ -464,9 +480,15 @@ import { useNotification } from '../contexts/NotificationContext';
     return `${mins} min ${secs.toString().padStart(2, '0')} sec`;
   };
 
-  const openVideoDialog = async (module, lesson) => {
+  const openVideoDialog = async (module, lesson, lang) => {
     // prefer explicit lesson.videoUrl, fallback to title map
-    const lessonUrl = lesson.videoUrl || (videoIdMap[lesson.title] ? `https://www.youtube.com/watch?v=${videoIdMap[lesson.title]}` : null);
+    const rawLessonUrl = lesson.videoUrl || (videoIdMap[lesson.title] ? `https://www.youtube.com/watch?v=${videoIdMap[lesson.title]}` : null);
+    // resolve when lesson.videoUrl is an object keyed by language
+    let lessonUrl = rawLessonUrl;
+    const effectiveLang = lang || language;
+    if (rawLessonUrl && typeof rawLessonUrl === 'object') {
+      lessonUrl = rawLessonUrl[effectiveLang] || rawLessonUrl.en || Object.values(rawLessonUrl)[0] || null;
+    }
     // if no URL, open dialog and show unavailable message so user has context
     if (!lessonUrl) {
       setSelectedModule(module);
@@ -485,7 +507,7 @@ import { useNotification } from '../contexts/NotificationContext';
     setShowVideoDialog(true);
     // if it's a YouTube URL, use the iframe API for ended event detection
     // support watch?v=, youtu.be/, and embed/ URL forms
-    const ytMatch = lessonUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{6,})/);
+    const ytMatch = typeof lessonUrl === 'string' ? lessonUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{6,})/) : null;
     if (ytMatch) {
       const videoId = ytMatch[1];
       setCustomVideoUrl(null);
@@ -1147,9 +1169,11 @@ import { useNotification } from '../contexts/NotificationContext';
               <Chip label={lesson.type} size="small" variant="outlined" />
               {lesson.type === 'video' && (
                 (!isPlayingNow ? (
-                  <Button size="small" onClick={(e) => { e.stopPropagation(); openVideoDialog(selectedModule, lesson); }}>
-                    Watch
-                  </Button>
+                  <Box sx={{ display: 'flex', gap: 1 }} onClick={(e) => e.stopPropagation()}>
+                    <Button size="small" onClick={() => openVideoDialog(selectedModule, lesson, 'en')}>Watch</Button>
+                    <Button size="small" onClick={() => openVideoDialog(selectedModule, lesson, 'bn')}>বাংলায় দেখুন</Button>
+                    <Button size="small" onClick={() => openVideoDialog(selectedModule, lesson, 'hi')}>हिंदी में देखें</Button>
+                  </Box>
                 ) : null)
               )}
             </Box>
