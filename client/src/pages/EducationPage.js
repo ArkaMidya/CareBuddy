@@ -1114,7 +1114,7 @@ import { useNotification } from '../contexts/NotificationContext';
                 {/* if no ratings, show empty stars (value=0) */}
                 <Rating value={getRatingCount(module.id) === 0 ? 0 : getAverageRating(module.id, module.rating)} readOnly size="small" />
                 <Typography variant="body2" color="text.secondary">
-                  {getRatingCount(module.id) === 0 ? '(0 . 1 rating)' : `(${getAverageRating(module.id, module.rating)} • ${getRatingCount(module.id)} ratings)`}
+                  {getRatingCount(module.id) === 0 ? '(0 . 0 rating)' : `(${getAverageRating(module.id, module.rating)} • ${getRatingCount(module.id)} ratings)`}
                 </Typography>
               </Box>
             </Box>
@@ -1503,23 +1503,7 @@ import { useNotification } from '../contexts/NotificationContext';
                 </List>
               </Paper>
 
-              {/* Recent Activity */}
-              <Paper sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Recent Activity
-                </Typography>
-                <List dense>
-                  {Object.keys(userProgress).slice(-3).map((key, index) => (
-                    <ListItem key={index}>
-                      <ListItemIcon><CheckCircle color="success" /></ListItemIcon>
-                      <ListItemText 
-                        primary="Lesson Completed" 
-                        secondary="2 hours ago"
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </Paper>
+              {/* Recent Activity removed */}
             </Box>
           </Grid>
         </Grid>
