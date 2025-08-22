@@ -105,6 +105,204 @@ import { useNotification } from '../contexts/NotificationContext';
   const [currentModuleRating, setCurrentModuleRating] = useState(0);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
   const [ratingValueInput, setRatingValueInput] = useState(null);
+  const [articleLang, setArticleLang] = useState('en');
+
+  const mapUiLangToKey = (uiLang) => {
+    switch (uiLang) {
+      case 'en': return 'english';
+      case 'bn': return 'bengali';
+      case 'hi': return 'hindi';
+      default: return 'english';
+    }
+  };
+
+  const articlesForLessons = {
+    'Meal Planning Basics': {
+      english: `Meal Planning Basics
+
+Balanced nutrition fuels health, supports growth and repair, and helps prevent disease. Focus on whole foods, portion control, and variety.
+
+Key idea: Build meals from vegetables, lean proteins, whole grains, healthy fats, and limit added sugars and excess salt.
+
+Practical tips: Fill half your plate with vegetables, choose whole grains, include a protein source at each meal, and prefer water over sugary drinks.
+
+Micronutrients: Eat colorful foods to cover vitamins and minerals; pregnant people should consider folic acid and iron.
+
+Meal planning: Batch-cook staples, pack healthy snacks (fruit, nuts, yogurt), and read labels for sodium and sugar.
+
+When to get help: See a clinician or registered dietitian for significant weight change, pregnancy, chronic disease, or suspected nutrient deficiencies.`,
+      hindi: `भोजन योजना की मूल बातें
+
+संतुलित पोषण स्वास्थ्य को ऊर्जा देता है, वृद्धि और मरम्मत में मदद करता है, और बीमारियों की रोकथाम में सहायक होता है। ध्यान दें – संपूर्ण (whole) खाद्य पदार्थों, भाग नियंत्रण (portion control), और विविधता पर।
+
+मुख्य विचार: भोजन को सब्ज़ियों, कम वसा वाले प्रोटीन, साबुत अनाज, स्वस्थ वसा से बनाएं, और अतिरिक्त चीनी व अधिक नमक को सीमित करें।
+
+व्यावहारिक सुझाव: अपनी प्लेट का आधा हिस्सा सब्ज़ियों से भरें, साबुत अनाज चुनें, हर भोजन में प्रोटीन का स्रोत शामिल करें, और मीठे पेयों की जगह पानी पिएं।
+
+सूक्ष्म पोषक तत्व (Micronutrients): रंग-बिरंगे खाद्य पदार्थ खाएं ताकि विटामिन और खनिज पूरे हों। गर्भवती महिलाओं को फोलिक एसिड और आयरन पर विशेष ध्यान देना चाहिए।
+
+भोजन योजना: ज़रूरी चीज़ों को बैच में पकाएं, स्वास्थ्यवर्धक नाश्ते (फल, मेवे, दही) साथ रखें, और सोडियम व चीनी के लिए लेबल पढ़ें।
+
+कब मदद लें: अगर वजन में बड़ा बदलाव हो, गर्भावस्था हो, कोई दीर्घकालिक बीमारी हो, या पोषक तत्वों की कमी का संदेह हो, तो चिकित्सक या पंजीकृत डाइटीशियन से सलाह लें।`,
+      bengali: `খাবারের পরিকল্পনার মূল বিষয়
+
+সুষম পুষ্টি আমাদের শরীরকে শক্তি জোগায়, বৃদ্ধি ও মেরামতে সাহায্য করে এবং রোগ প্রতিরোধে ভূমিকা রাখে। গুরুত্ব দিন — প্রাকৃতিক (whole) খাবার, পরিমাণ নিয়ন্ত্রণ এবং বৈচিত্র্যের উপর।
+
+মূল ভাবনা: খাবার সাজান শাকসবজি, কম চর্বিযুক্ত প্রোটিন, পূর্ণ শস্য, স্বাস্থ্যকর চর্বি দিয়ে, আর অতিরিক্ত চিনি ও লবণ সীমিত করুন।
+
+ব্যবহারিক পরামর্শ: প্লেটের অর্ধেক ভরুন শাকসবজি দিয়ে, পূর্ণ শস্য বেছে নিন, প্রতিটি খাবারে প্রোটিন রাখুন, আর চিনিযুক্ত পানীয়র বদলে পানি পান করুন।
+
+মাইক্রোনিউট্রিয়েন্টস: রঙিন খাবার খান যাতে ভিটামিন ও খনিজ পূরণ হয়। গর্ভবতী নারীদের ফোলিক অ্যাসিড ও আয়রনের দিকে বিশেষ নজর দেওয়া উচিত।
+
+খাবারের পরিকল্পনা: দরকারি জিনিস একসাথে রান্না করে রাখুন, স্বাস্থ্যকর নাস্তা (ফল, বাদাম, দই) সঙ্গে রাখুন, আর খাবারের লেবেল দেখে নিন লবণ ও চিনি কেমন আছে।
+
+কখন সাহায্য নিতে হবে: ওজনের বড় পরিবর্তন হলে, গর্ভাবস্থায়, দীর্ঘস্থায়ী অসুস্থতায়, বা পুষ্টির ঘাটতির সন্দেহ হলে চিকিৎসক বা নিবন্ধিত ডায়েটিশিয়ানের সঙ্গে পরামর্শ করুন।`,
+    },
+    'Building Resilience': {
+      english: `Building Resilience
+
+Mental health is as important as physical health. Early recognition and small daily habits improve resilience and functioning.
+
+Key idea: Mental wellbeing involves emotional regulation, meaningful relationships, and coping skills.
+
+Daily actions: Prioritize sleep, regular movement, social contact, and brief mindfulness or breathing exercises.
+
+Coping strategies: Use structured routines, problem-solving, and activities that provide mastery and pleasure.
+
+When to seek help: Persistent sadness, anxiety that limits functioning, suicidal thoughts, or major behavior changes—contact a mental health professional.
+
+Resources: Peer support, counseling, and evidence-based therapies (e.g., CBT) are effective.`,
+      hindi: `लचीलापन (Resilience) बनाना
+
+मानसिक स्वास्थ्य उतना ही महत्वपूर्ण है जितना शारीरिक स्वास्थ्य। समय पर पहचान और छोटी-छोटी दैनिक आदतें लचीलापन और कार्यक्षमता को बेहतर बनाती हैं।
+
+मुख्य विचार: मानसिक सुख-समृद्धि का अर्थ है भावनाओं पर नियंत्रण, सार्थक रिश्ते, और सामना करने की क्षमता।
+
+दैनिक क्रियाएँ: नींद को प्राथमिकता दें, नियमित शारीरिक गतिविधि करें, सामाजिक संपर्क बनाए रखें, और थोड़े समय के लिए माइंडफुलनेस या श्वास-प्रश्वास अभ्यास करें।
+
+सामना करने की रणनीतियाँ: नियमित दिनचर्या अपनाएँ, समस्याओं का समाधान ढूंढें, और ऐसी गतिविधियाँ करें जिनसे संतुष्टि व आनंद मिले।
+
+कब मदद लें: लगातार उदासी, ऐसा तनाव/चिंता जो कार्यक्षमता को सीमित करे, आत्महत्या के विचार, या व्यवहार में बड़ा बदलाव—ऐसे समय मानसिक स्वास्थ्य विशेषज्ञ से संपर्क करें।
+
+संसाधन: साथी समूह का सहयोग, परामर्श, और प्रमाण-आधारित थेरेपी (जैसे CBT) प्रभावी हैं।`,
+      bengali: `স্থিতিস্থাপকতা (Resilience) গড়ে তোলা
+
+মানসিক স্বাস্থ্য শারীরিক স্বাস্থ্যের মতোই গুরুত্বপূর্ণ। আগেভাগে চিহ্নিত করা এবং ছোট ছোট দৈনন্দিন অভ্যাস স্থিতিস্থাপকতা ও কর্মক্ষমতা উন্নত করে।
+
+মূল ভাবনা: মানসিক সুস্থতা মানে হলো আবেগ নিয়ন্ত্রণ, অর্থবহ সম্পর্ক এবং মোকাবেলার দক্ষতা।
+
+দৈনন্দিন কাজ: ঘুমকে গুরুত্ব দিন, নিয়মিত শরীরচর্চা করুন, সামাজিক যোগাযোগ রাখুন এবং অল্প সময়ের জন্য মাইন্ডফুলনেস বা শ্বাস-প্রশ্বাসের ব্যায়াম করুন।
+
+মোকাবেলার কৌশল: গঠিত রুটিন ব্যবহার করুন, সমস্যার সমাধান বের করুন এবং এমন কাজ করুন যা দক্ষতা ও আনন্দ দেয়।
+
+কখন সাহায্য নিতে হবে: দীর্ঘস্থায়ী দুঃখ, কর্মক্ষমতা কমিয়ে দেওয়া উদ্বেগ, আত্মহত্যার চিন্তা, বা বড় ধরনের আচরণের পরিবর্তন হলে মানসিক স্বাস্থ্য বিশেষজ্ঞের সঙ্গে যোগাযোগ করুন।
+
+উপায়: সহপাঠীর সহায়তা, কাউন্সেলিং এবং প্রমাণ-ভিত্তিক থেরাপি (যেমন CBT) কার্যকর।`,
+    },
+    'Family Planning Basics': {
+      english: `Family Planning Basics
+
+Reproductive health covers safe conception, pregnancy, childbirth, and access to family planning and STI prevention.
+
+- Key idea: Access to accurate information, contraception, prenatal/postnatal care, and respectful services improves outcomes.
+- Preconception: Folic acid, immunization checks, and health reviews reduce risks.
+- Pregnancy care: Regular antenatal visits, balanced nutrition, avoid tobacco/alcohol, and seek care for warning signs.
+- Family planning & STI prevention: Offer reliable contraception and condoms; test and treat STIs when needed.
+- Support: Provide youth-friendly education, maternal services, and nonjudgmental counseling.`,
+      hindi: `परिवार नियोजन की मूल बातें
+
+प्रजनन स्वास्थ्य में सुरक्षित गर्भधारण, गर्भावस्था, प्रसव और परिवार नियोजन तथा यौन संचारित संक्रमण (STI) की रोकथाम शामिल है।
+
+मुख्य विचार: सटीक जानकारी, गर्भनिरोधक साधन, प्रसवपूर्व/प्रसवोत्तर देखभाल और सम्मानजनक सेवाओं की उपलब्धता परिणामों को बेहतर बनाती है।
+
+गर्भधारण से पहले: फोलिक एसिड लेना, टीकाकरण की जाँच करना और स्वास्थ्य समीक्षा करना जोखिमों को कम करता है।
+
+गर्भावस्था देखभाल: नियमित प्रसवपूर्व जांच कराएँ, संतुलित आहार लें, तंबाकू/शराब से बचें, और चेतावनी संकेत दिखने पर तुरंत देखभाल लें।
+
+परिवार नियोजन एवं STI रोकथाम: विश्वसनीय गर्भनिरोधक और कंडोम उपलब्ध कराएँ; आवश्यकता पड़ने पर STI की जांच और इलाज करें।
+
+सहायता: युवाओं के लिए अनुकूल शिक्षा, मातृ सेवाएँ, और बिना भेदभाव वाली परामर्श सेवाएँ प्रदान करें।`,
+      bengali: `পরিবার পরিকল্পনার মূল বিষয়
+
+প্রজনন স্বাস্থ্য অন্তর্ভুক্ত করে নিরাপদ গর্ভধারণ, গর্ভাবস্থা, সন্তান জন্ম এবং পরিবার পরিকল্পনা ও যৌনবাহিত সংক্রমণ (STI) প্রতিরোধ।
+
+মূল ভাবনা: সঠিক তথ্য, গর্ভনিরোধক, প্রসব-পূর্ব/প্রসব-পরবর্তী যত্ন এবং সম্মানজনক সেবা প্রাপ্যতা ফলাফল উন্নত করে।
+
+গর্ভধারণের আগে: ফোলিক অ্যাসিড গ্রহণ, টিকাদান পরীক্ষা এবং স্বাস্থ্য পর্যালোচনা ঝুঁকি কমায়।
+
+গর্ভাবস্থার যত্ন: নিয়মিত প্রসব-পূর্ব পরীক্ষা করুন, সুষম খাদ্য গ্রহণ করুন, তামাক/মদ্যপান এড়িয়ে চলুন এবং সতর্ক সংকেত দেখা দিলে দ্রুত যত্ন নিন।
+
+পরিবার পরিকল্পনা ও STI প্রতিরোধ: নির্ভরযোগ্য গর্ভনিরোধক ও কনডম ব্যবহার করুন; প্রয়োজনে STI পরীক্ষা ও চিকিৎসা করুন।
+
+সহায়তা: যুববান্ধব শিক্ষা, মাতৃসেবা এবং বৈষম্যহীন পরামর্শ প্রদান করুন।`,
+    },
+    'Personal Hygiene': {
+      english: `Good hygiene and sanitation prevent infections and support community health.
+
+- Key idea: Regular behaviors (handwashing, safe food handling, clean water) reduce disease transmission.
+- Handwashing: Use soap and scrub for ~20 seconds, especially before eating and after using the toilet.
+- Food safety: Separate raw and cooked foods, cook to safe temperatures, and store properly.
+- Household sanitation: Safe waste disposal, clean water (boil or treat if needed), and surface cleaning reduce outbreaks.
+- Community actions: Promote vaccination, clean delivery practices, and hygiene education.`,
+      hindi: `अच्छी स्वच्छता और स्वच्छता प्रथाएँ
+
+अच्छी स्वच्छता और साफ-सफाई संक्रमणों को रोकती है और सामुदायिक स्वास्थ्य को समर्थन देती है।
+
+मुख्य विचार: नियमित आदतें (हाथ धोना, सुरक्षित भोजन संभालना, साफ पानी) बीमारियों के प्रसार को कम करती हैं।
+
+हाथ धोना: साबुन का उपयोग करें और लगभग 20 सेकंड तक रगड़ें, विशेषकर खाने से पहले और शौचालय के बाद।
+
+भोजन सुरक्षा: कच्चे और पके भोजन को अलग रखें, सुरक्षित तापमान पर पकाएँ, और सही तरीके से संग्रह करें।
+
+घर की स्वच्छता: सुरक्षित कचरा निपटान, स्वच्छ पानी (जरूरत पड़ने पर उबालें या शुद्ध करें), और सतहों की सफाई से बीमारियों का फैलाव कम होता हैं।
+
+सामुदायिक कार्य: टीकाकरण को बढ़ावा दें, सुरक्षित प्रसव प्रथाओं को अपनाएँ, और स्वच्छता शिक्षा फैलाएँ।`,
+      bengali: `Good hygiene and sanitation prevent infections and support community health.
+
+- Key idea: Regular behaviors (handwashing, safe food handling, clean water) reduce disease transmission.
+- Handwashing: Use soap and scrub for ~20 seconds, especially before eating and after using the toilet.
+- Food safety: Separate raw and cooked foods, cook to safe temperatures, and store properly.
+- Household sanitation: Safe waste disposal, clean water (boil or treat if needed), and surface cleaning reduce outbreaks.
+- Community actions: Promote vaccination, clean delivery practices, and hygiene education.`,
+    },
+    'Wound Care': {
+      english: `Wound Care
+
+Timely first aid stabilizes people and reduces harm before professional help arrives.
+
+- Key idea: Prioritize scene safety, call for help, then apply basic interventions.
+- Severe bleeding: Apply direct pressure to control bleeding and seek urgent care.
+- Burns & wounds: Cool burns with running water; clean and cover wounds and watch for signs of infection.
+- CPR & emergencies: If unresponsive and not breathing, start CPR and call emergency services.
+- Preparedness: Learn basic CPR/first aid, keep a stocked kit, and know emergency numbers.`,
+      hindi: `घाव की देखभाल (Wound Care)
+
+समय पर प्राथमिक उपचार व्यक्ति को स्थिर करता है और पेशेवर मदद आने से पहले नुकसान को कम करता है।
+
+मुख्य विचार: सबसे पहले स्थान की सुरक्षा सुनिश्चित करें, मदद के लिए कॉल करें, फिर बुनियादी हस्तक्षेप लागू करें।
+
+गंभीर रक्तस्राव: रक्तस्राव को नियंत्रित करने के लिए सीधे दबाव डालें और तुरंत चिकित्सा सहायता लें।
+
+जलन और घाव: जलन को बहते पानी से ठंडा करें; घाव को साफ करके ढकें और संक्रमण के लक्षणों पर नज़र रखें।
+
+सीपीआर और आपात स्थिति: यदि व्यक्ति बेहोश है और साँस नहीं ले रहा है, तो सीपीआर शुरू करें और आपातकालीन सेवाओं को कॉल करें।
+
+तैयारी: बुनियादी सीपीआर/प्राथमिक चिकित्सा सीखें, अच्छी तरह से भरी हुई प्राथमिक उपचार किट रखें, और आपातकालीन नंबर जानें।`,
+      bengali: `ক্ষত পরিচর্যা (Wound Care)
+
+সময়ে প্রাথমিক চিকিৎসা দিলে রোগী স্থিতিশীল হয় এবং পেশাদার সাহায্য আসার আগে ক্ষতি কমে যায়।
+
+মূল ভাবনা: প্রথমে জায়গার নিরাপত্তা নিশ্চিত করুন, সাহায্যের জন্য ফোন করুন, তারপর প্রাথমিক হস্তক্ষেপ করুন।
+
+তীব্র রক্তপাত: রক্তপাত বন্ধ করতে সরাসরি চাপ দিন এবং দ্রুত চিকিৎসা নিন।
+
+পোড়া ও ক্ষত: পোড়া স্থানে চলমান পানির নিচে ঠান্ডা করুন; ক্ষত পরিষ্কার করে ঢেকে দিন এবং সংক্রমণের লক্ষণ পর্যবেক্ষণ করুন।
+
+সিপিআর ও জরুরি অবস্থা: যদি রোগী অচেতন থাকে এবং শ্বাস না নেয়, তবে সিপিআর শুরু করুন এবং জরুরি সেবায় কল করুন।
+
+প্রস্তুতি: মৌলিক সিপিআর/প্রথম চিকিৎসা শিখুন, প্রয়োজনীয় সামগ্রীসহ একটি ফার্স্ট এইড কিট রাখুন এবং জরুরি নম্বরগুলো জানুন।`,
+    }
+  };
 
   // Progress report helpers
   const getCompletedCountForModule = (module) => {
@@ -1503,7 +1701,7 @@ import { useNotification } from '../contexts/NotificationContext';
                 </List>
               </Paper>
 
-              {/* Recent Activity removed */}
+              
             </Box>
           </Grid>
         </Grid>
@@ -1649,9 +1847,22 @@ import { useNotification } from '../contexts/NotificationContext';
           <DialogTitle>{selectedLesson ? selectedLesson.title : 'Lesson'}</DialogTitle>
           <DialogContent>
             <Box sx={{ mb: 2 }}>
-              <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
-                {selectedLesson?.content || 'No content available for this lesson.'}
-              </Typography>
+              {selectedLesson?.type === 'article' && articlesForLessons[selectedLesson.title] ? (
+                <Box>
+                  <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                    <Button variant={articleLang === 'en' ? 'contained' : 'outlined'} onClick={() => setArticleLang('en')}>English</Button>
+                    <Button variant={articleLang === 'bn' ? 'contained' : 'outlined'} onClick={() => setArticleLang('bn')}>বাংলা</Button>
+                    <Button variant={articleLang === 'hi' ? 'contained' : 'outlined'} onClick={() => setArticleLang('hi')}>हिन्दी</Button>
+                  </Box>
+                  <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+                    {articlesForLessons[selectedLesson.title]?.[mapUiLangToKey(articleLang)] || selectedLesson?.content || 'No content available for this lesson.'}
+                  </Typography>
+                </Box>
+              ) : (
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+                  {selectedLesson?.content || 'No content available for this lesson.'}
+                </Typography>
+              )}
               <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
                 <Button variant="contained" onClick={() => { markLessonComplete(selectedLesson); setShowLessonContentDialog(false); }} startIcon={<CheckCircle />}>Mark as Complete</Button>
                 <Button variant="outlined" onClick={() => setShowLessonContentDialog(false)}>Close</Button>
