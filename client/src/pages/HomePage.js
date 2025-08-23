@@ -258,6 +258,7 @@ const HomePage = () => {
                 sx={{
                   fontWeight: 700,
                   mb: 3,
+                  color: 'white',
                   textShadow: '0 2px 4px rgba(0,0,0,0.1)',
                   fontSize: { xs: '2.5rem', md: '3.5rem' },
                 }}
@@ -268,6 +269,7 @@ const HomePage = () => {
                 variant="h5"
                 sx={{
                   mb: 4,
+                  color: 'white',
                   opacity: 0.9,
                   lineHeight: 1.4,
                   fontWeight: 400,
@@ -626,6 +628,7 @@ const HomePage = () => {
               variant="h3"
               sx={{
                 mb: 3,
+                color: 'white',
                 fontWeight: 700,
                 textShadow: '0 2px 4px rgba(0,0,0,0.1)',
               }}
@@ -636,6 +639,7 @@ const HomePage = () => {
               variant="h6"
               sx={{
                 mb: 4,
+                color: 'white',
                 opacity: 0.9,
                 lineHeight: 1.6,
                 maxWidth: 600,

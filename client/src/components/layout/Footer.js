@@ -111,7 +111,7 @@ const Footer = () => {
                   <HealthAndSafety sx={{ fontSize: 24, color: 'white' }} />
                 </Box>
                 <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5, color: 'white' }}>
                     Care Buddy
                   </Typography>
                   <Chip
