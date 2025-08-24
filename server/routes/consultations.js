@@ -5,6 +5,7 @@ const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const router = express.Router();
 const Consultation = require('../models/Consultation');
 const User = require('../models/User');
+const Prescription = require('../models/Prescription');
 
 // @route   GET /api/consultations
 // @desc    Get consultations
@@ -61,10 +62,18 @@ router.get('/', [
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
 
+    // Attach any prescription for each consultation
+    const consultationsWithPrescriptions = await Promise.all(consultations.map(async (c) => {
+      const pres = await Prescription.findOne({ consultation: c._id });
+      const obj = c.toObject ? c.toObject() : c;
+      obj.prescription = pres || null;
+      return obj;
+    }));
+
     res.json({
       success: true,
       data: {
-        consultations,
+        consultations: consultationsWithPrescriptions,
         pagination: {
           current: parseInt(page),
           total: Math.ceil(total / parseInt(limit)),
@@ -198,6 +207,72 @@ router.post('/:id/respond', [
   } catch (e) {
     console.error(e);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Create prescription for a consultation (doctor only)
+router.post('/:id/prescriptions', [
+  authenticateToken,
+  authorizeRole('doctor','health_worker'),
+  body('medications').isArray({ min: 1 }).withMessage('Medications array is required'),
+  body('notes').optional().trim()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+
+    const { id } = req.params;
+    const consultation = await Consultation.findById(id);
+    if (!consultation) return res.status(404).json({ success: false, message: 'Consultation not found' });
+    if (String(consultation.provider) !== String(req.user._id)) return res.status(403).json({ success: false, message: 'Not authorized to prescribe for this consultation' });
+
+    // Upsert prescription
+    let prescription = await Prescription.findOne({ consultation: id });
+    if (prescription) {
+      prescription.medications = req.body.medications;
+      prescription.notes = req.body.notes || '';
+      await prescription.save();
+    } else {
+      prescription = new Prescription({
+        consultation: id,
+        prescribedBy: req.user._id,
+        patient: consultation.patient,
+        medications: req.body.medications,
+        notes: req.body.notes || ''
+      });
+      await prescription.save();
+    }
+
+    // notify patient
+    try {
+      const io = req.app.get('io');
+      const providerInfo = await User.findById(req.user._id).select('firstName lastName email');
+      const message = `${providerInfo ? (providerInfo.firstName || providerInfo.email) : 'Provider'} issued an e-prescription`;
+      if (io) io.to(String(consultation.patient)).emit('prescription:created', { prescription, message });
+    } catch (e) { console.error('Socket emit error:', e); }
+
+    return res.status(201).json({ success: true, message: 'Prescription saved', data: { prescription } });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get prescription for a consultation (patient or provider)
+router.get('/:id/prescriptions', [authenticateToken], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const prescription = await Prescription.findOne({ consultation: id });
+    if (!prescription) return res.status(404).json({ success: false, message: 'Prescription not found' });
+    const consultation = await Consultation.findById(id);
+    if (!consultation) return res.status(404).json({ success: false, message: 'Consultation not found' });
+    if (String(consultation.patient) !== String(req.user._id) && String(consultation.provider) !== String(req.user._id)) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+    return res.json({ success: true, data: { prescription } });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

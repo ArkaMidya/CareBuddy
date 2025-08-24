@@ -23,13 +23,14 @@ import {
   alpha,
 } from '@mui/material';
 import { VideoCall, CalendarToday } from '@mui/icons-material';
-import consultationService from '../services/consultationService';
 import userService from '../services/userService';
+import consultationService from '../services/consultationService';
 import CountdownTimer from '../components/common/CountdownTimer';
 import { useNotification } from '../contexts/NotificationContext';
 import { io as ioClient } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+
 
 const ConsultationsPage = () => {
   const [doctors, setDoctors] = useState([]);
@@ -43,6 +44,9 @@ const ConsultationsPage = () => {
   const [callInfo, setCallInfo] = useState(null); // { id, type }
   const [openCall, setOpenCall] = useState(false);
   const [tick, setTick] = useState(0); // used to force re-render when timers expire
+  const [openPrescription, setOpenPrescription] = useState(false);
+  const [prescriptionForm, setPrescriptionForm] = useState({ medications: [{ name: '', dosage: '', frequency: '', duration: '' }], notes: '' });
+  const [currentConsultationForPrescription, setCurrentConsultationForPrescription] = useState(null);
 
   const nextUpcomingId = useMemo(() => {
     const now = new Date();
@@ -215,7 +219,155 @@ const ConsultationsPage = () => {
     }
   };
 
+  // Prescription helpers (doctor)
+  const addMedicationRow = () => {
+    setPrescriptionForm(f => ({ ...f, medications: [...(f.medications || []), { name: '', dosage: '', frequency: '', duration: '' }] }));
+  };
+
+  const updateMedicationField = (index, field, value) => {
+    setPrescriptionForm(f => {
+      const meds = (f.medications || []).map((m, i) => i === index ? { ...m, [field]: value } : m);
+      return { ...f, medications: meds };
+    });
+  };
+
+  const removeMedicationRow = (index) => {
+    setPrescriptionForm(f => ({ ...f, medications: (f.medications || []).filter((_, i) => i !== index) }));
+  };
+
+  const submitPrescription = async () => {
+    if (!currentConsultationForPrescription) return;
+    try {
+      setLoading(true);
+      const payload = { medications: prescriptionForm.medications.filter(m => m.name), notes: prescriptionForm.notes };
+      await consultationService.createPrescription(currentConsultationForPrescription._id || currentConsultationForPrescription.id, payload, token);
+      notify.showSuccess('Prescription saved');
+      setOpenPrescription(false);
+      fetchConsultations();
+    } catch (e) {
+      console.error(e);
+      notify.showError('Failed to save prescription');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadPrescription = (prescription, consultation) => {
+    const patient = consultation?.patient || {};
+    const provider = consultation?.provider || {};
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>e-Prescription</title><style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:8px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px;text-align:left}</style></head><body><h2>e-Prescription</h2><div><strong>Patient:</strong> ${patient.firstName || ''} ${patient.lastName || ''} (${patient.email || ''})</div><div><strong>Provider:</strong> ${provider.firstName || ''} ${provider.lastName || ''}</div><div style="margin-top:12px"><strong>Issued:</strong> ${new Date(prescription.issuedAt || prescription.createdAt || Date.now()).toLocaleString()}</div><h3 style="margin-top:16px">Medications</h3><table><thead><tr><th>Name</th><th>Dosage</th><th>Frequency</th><th>Duration</th></tr></thead><tbody>${(prescription.medications || []).map(m => `<tr><td>${m.name || ''}</td><td>${m.dosage || ''}</td><td>${m.frequency || ''}</td><td>${m.duration || ''}</td></tr>`).join('')}</tbody></table><h3 style="margin-top:12px">Notes</h3><div>${(prescription.notes || '')}</div></body></html>`;
+
+    try {
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const filename = `prescription-${(consultation && (consultation._id || consultation.id)) || Date.now()}.html`;
+      a.href = url;
+      a.download = filename;
+      // Some browsers require the element to be in the DOM
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // release
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      notify.showSuccess('Prescription download started');
+    } catch (e) {
+      console.error('Download failed, falling back to open tab:', e);
+      const win = window.open('', '_blank');
+      if (!win) return notify.showError('Unable to open print window — check popup blocker');
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+    }
+  };
+
   const statuses = ['scheduled', 'in_progress', 'completed', 'cancelled', 'requested', 'denied'];
+
+  const renderConsultationCard = (c) => {
+    const now = new Date();
+    const start = c.scheduledAt ? new Date(c.scheduledAt) : null;
+    const end = c.scheduledEnd ? new Date(c.scheduledEnd) : (start ? new Date(start.getTime() + 30 * 60 * 1000) : null);
+
+    return (
+      <Grid key={c._id || c.id} item xs={12} md={6} lg={4}>
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+              <Chip label={c.status} size="small" />
+              <Chip label={c.type} variant="outlined" size="small" />
+            </Box>
+            {(role === 'health_worker' || role === 'doctor') ? (
+              <Typography variant="h6" sx={{ mb: 1 }}>Patient: {c.patient?.firstName} {c.patient?.lastName}</Typography>
+            ) : (
+              <Typography variant="h6" sx={{ mb: 1 }}>Doctor: {c.provider?.firstName} {c.provider?.lastName}</Typography>
+            )}
+            <Typography variant="body2" color="text.secondary">Email: {c.patient?.email || c.provider?.email}</Typography>
+            {c.notes && <Typography variant="body2" sx={{ mt: 1 }}>Notes: {c.notes}</Typography>}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+              <CalendarToday fontSize="small" />
+              <Typography variant="caption">{c.scheduledAt ? new Date(c.scheduledAt).toLocaleString() : 'Not scheduled'}</Typography>
+            </Box>
+          </CardContent>
+          <CardActions>
+            {c.status === 'requested' && (role === 'health_worker' || role === 'doctor') && (
+              <>
+                <Button size="small" onClick={async () => {
+                  try {
+                    await consultationService.respond(c._id || c.id, 'accept', token);
+                    notify.showSuccess('Accepted consultation');
+                    fetchConsultations();
+                  } catch (e) { notify.showError('Failed to accept'); }
+                }}>Accept</Button>
+                <Button size="small" onClick={async () => {
+                  try {
+                    await consultationService.respond(c._id || c.id, 'deny', token);
+                    notify.showSuccess('Denied consultation');
+                    fetchConsultations();
+                  } catch (e) { notify.showError('Failed to deny'); }
+                }}>Deny</Button>
+              </>
+            )}
+
+            {(c.type === 'video' || c.type === 'audio') && (() => {
+              if (!start || !end) return null;
+              if (now < start) {
+                if ((c._id || c.id) === nextUpcomingId) {
+                  return (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CountdownTimer deadline={start} label="Starts in" onExpired={() => setTick(t => t + 1)} />
+                    </Box>
+                  );
+                }
+                return null;
+              }
+              if (now >= start && now <= end) {
+                if (c.status !== 'completed') return <Button size="small" onClick={() => { setCallInfo({ id: c._id || c.id, type: c.type }); setOpenCall(true); }}>Join</Button>;
+                return null;
+              }
+              return (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" color="text.secondary">Time Over</Typography>
+                </Box>
+              );
+            })()}
+
+            {(role === 'doctor' || role === 'health_worker') && (
+              <>
+                {c.prescription ? (
+                  <Button size="small" onClick={() => downloadPrescription(c.prescription, c)}>Download Prescription</Button>
+                ) : (end && now > end) ? (
+                  <Button size="small" onClick={() => { setCurrentConsultationForPrescription(c); setPrescriptionForm({ medications: [{ name: '', dosage: '', frequency: '', duration: '' }], notes: '' }); setOpenPrescription(true); }}>Prescribe</Button>
+                ) : null}
+              </>
+            )}
+            {role === 'patient' && c.prescription && (
+              <Button size="small" onClick={() => downloadPrescription(c.prescription, c)}>Download Prescription</Button>
+            )}
+          </CardActions>
+        </Card>
+      </Grid>
+    );
+  };
 
   return (
     <Container maxWidth="lg">
@@ -276,101 +428,7 @@ const ConsultationsPage = () => {
 
         <Grid container spacing={2}>
           { consultations.length > 0 ? (
-            consultations.filter(c => !(role === 'patient' && c.status === 'requested')).map((c) => (
-              <Grid key={c._id || c.id} item xs={12} md={6} lg={4}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Chip label={c.status} size="small" />
-                      <Chip label={c.type} variant="outlined" size="small" />
-                    </Box>
-                    { (role === 'health_worker' || role === 'doctor') ? (
-                      <Typography variant="h6" sx={{ mb: 1 }}>Patient: {c.patient?.firstName} {c.patient?.lastName}</Typography>
-                    ) : (
-                      <Typography variant="h6" sx={{ mb: 1 }}>Doctor: {c.provider?.firstName} {c.provider?.lastName}</Typography>
-                    )}
-                    <Typography variant="body2" color="text.secondary">Email: {c.patient?.email || c.provider?.email}</Typography>
-                    {c.notes && <Typography variant="body2" sx={{ mt: 1 }}>Notes: {c.notes}</Typography>}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                      <CalendarToday fontSize="small" />
-                      <Typography variant="caption">{c.scheduledAt ? new Date(c.scheduledAt).toLocaleString() : 'Not scheduled'}</Typography>
-                    </Box>
-                    {/* Countdown & Join logic (only render per-card timer in actions area) */}
-                  </CardContent>
-                  <CardActions>
-                    {c.status === 'requested' && (role === 'health_worker' || role === 'doctor') && (
-                      <> 
-                        <Button size="small" onClick={async () => {
-                          try {
-                            await consultationService.respond(c._id || c.id, 'accept', token);
-                            notify.showSuccess('Accepted consultation');
-                            fetchConsultations();
-                          } catch (e) { notify.showError('Failed to accept'); }
-                        }}>Accept</Button>
-                        <Button size="small" onClick={async () => {
-                          try {
-                            await consultationService.respond(c._id || c.id, 'deny', token);
-                            notify.showSuccess('Denied consultation');
-                            fetchConsultations();
-                          } catch (e) { notify.showError('Failed to deny'); }
-                        }}>Deny</Button>
-                      </>
-                    )}
-                    {(c.type === 'video' || c.type === 'audio') && (
-                      (() => {
-                        const now = new Date();
-                        const start = c.scheduledAt ? new Date(c.scheduledAt) : null;
-                        const end = c.scheduledEnd ? new Date(c.scheduledEnd) : (start ? new Date(start.getTime() + 30 * 60 * 1000) : null);
-                        if (!start || !end) return null;
-
-                        if (now < start) {
-                          // before start: show countdown only for the next upcoming consultation
-                          if ((c._id || c.id) === nextUpcomingId) {
-                            return (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <CountdownTimer deadline={start} label="Starts in" onExpired={() => setTick(t => t + 1)} />
-                              </Box>
-                            );
-                          }
-                          return null;
-                        }
-
-                        if (now >= start && now <= end) {
-                          // within meeting window: show Join only if status not completed
-                          if (c.status !== 'completed') {
-                            return <Button size="small" onClick={() => { setCallInfo({ id: c._id || c.id, type: c.type }); setOpenCall(true); }}>Join</Button>;
-                          }
-                          return null;
-                        }
-
-                        // after end: show Time Over (and allow Dismiss to mark completed if not already)
-                        return (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="caption" color="text.secondary">Time Over</Typography>
-                            {(c.status !== 'completed') && (role === 'health_worker' || role === 'doctor' || role === 'admin' || role === 'ngo' || role === 'patient') && (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                color="info"
-                                onClick={async () => {
-                                  try {
-                                    await consultationService.respond(c._id || c.id, 'completed', token); // Update status to completed
-                                    notify.showSuccess('Consultation dismissed.');
-                                    fetchConsultations(); // Refresh list
-                                  } catch (e) {
-                                    notify.showError('Failed to dismiss consultation.');
-                                  }
-                                }}
-                              >Dismiss</Button>
-                            )}
-                          </Box>
-                        );
-                      })()
-                    )}
-                  </CardActions>
-                </Card>
-              </Grid>
-            ))
+            consultations.filter(c => !(role === 'patient' && c.status === 'requested')).map(c => renderConsultationCard(c))
           ) : (
             role === 'patient' && doctors.length > 0 ? (
               (specializationFilter ? doctors.filter(d => (d.providerInfo?.specialization || []).includes(specializationFilter)) : doctors).map((doc) => (
@@ -501,6 +559,37 @@ const ConsultationsPage = () => {
               </Button>
             )}
             <Button onClick={() => setOpenCall(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+        {/* Prescription Dialog */}
+        <Dialog open={openPrescription} onClose={() => setOpenPrescription(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>e-Prescription</DialogTitle>
+          <DialogContent>
+            <Box>
+              {(prescriptionForm.medications || []).map((m, idx) => (
+                <Grid container spacing={1} key={idx} sx={{ mb: 1 }}>
+                  <Grid item xs={12} sm={5}>
+                    <TextField label="Medication" fullWidth value={m.name} onChange={(e) => updateMedicationField(idx, 'name', e.target.value)} />
+                  </Grid>
+                  <Grid item xs={12} sm={7}>
+                    <Grid container spacing={1}>
+                      <Grid item xs={12} sm={4}><TextField label="Dosage" fullWidth value={m.dosage} onChange={(e) => updateMedicationField(idx, 'dosage', e.target.value)} /></Grid>
+                      <Grid item xs={12} sm={4}><TextField label="Frequency" fullWidth value={m.frequency} onChange={(e) => updateMedicationField(idx, 'frequency', e.target.value)} /></Grid>
+                      <Grid item xs={12} sm={4}><TextField label="Duration" fullWidth value={m.duration} onChange={(e) => updateMedicationField(idx, 'duration', e.target.value)} /></Grid>
+                    </Grid>
+                  </Grid>
+                  <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button size="small" color="error" onClick={() => removeMedicationRow(idx)}>Remove</Button>
+                  </Grid>
+                </Grid>
+              ))}
+              <Button onClick={addMedicationRow}>Add Medication</Button>
+              <TextField label="Notes" fullWidth multiline minRows={3} sx={{ mt: 2 }} value={prescriptionForm.notes} onChange={(e) => setPrescriptionForm(f => ({ ...f, notes: e.target.value }))} />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenPrescription(false)}>Cancel</Button>
+            <Button onClick={submitPrescription} variant="contained">Save Prescription</Button>
           </DialogActions>
         </Dialog>
       </Box>
