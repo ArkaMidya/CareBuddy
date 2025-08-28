@@ -248,12 +248,31 @@ router.post('/', [
 
     await campaignDoc.save();
 
+
     // notify all connected users about new campaign
     try {
       const io = req.app.get('io');
       if (io) io.emit('campaign:created', campaignDoc);
     } catch (e) {
       console.error('Failed to emit campaign:created', e);
+    }
+
+    // Email notification to all users
+    try {
+      const sendEmail = require('../utils/sendEmail');
+      const User = require('../models/User');
+      const users = await User.find({ 'preferences.notifications.email': true, isActive: true }).select('email');
+      const emails = users.map(u => u.email).filter(Boolean);
+      if (emails.length > 0) {
+        // Send in batches if needed (for large user base, use a queue or service)
+        await Promise.all(emails.map(email => sendEmail({
+          to: email,
+          subject: 'New Health Campaign Created',
+          text: `A new campaign "${title}" has been created. Log in to CareBuddy for details and registration.`
+        })));
+      }
+    } catch (e) {
+      console.error('Failed to send campaign email notifications', e);
     }
 
     res.status(201).json({

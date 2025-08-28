@@ -100,6 +100,18 @@ router.post('/register', [
     user.lastLogin = new Date();
     await user.save();
 
+    // Send welcome email
+    try {
+      const sendEmail = require('../utils/sendEmail');
+      await sendEmail({
+        to: user.email,
+        subject: 'Welcome to CareBuddy',
+        text: `Hello ${user.firstName},\n\nWelcome to CareBuddy! Your registration was successful.\n\nThank you for joining us.`,
+      });
+    } catch (e) {
+      console.error('Failed to send welcome email', e);
+    }
+
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
