@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import MapPicker from '../common/MapPicker';
 import {
   Box,
   Paper,
@@ -132,13 +133,17 @@ const ReportForm = ({ onSubmit }) => {
     publicHealthRisk: false,
     symptomsOnset: '',
     exposureDetails: '',
-    preventiveMeasures: ''
+    preventiveMeasures: '',
+    coordinates: null // { lat, lng }
   });
   const [errors, setErrors] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const handleNext = () => {
+    setSubmitAttempted(true);
     if (validateStep(activeStep)) {
       setActiveStep((prevStep) => prevStep + 1);
+      setSubmitAttempted(false);
     }
   };
 
@@ -153,6 +158,18 @@ const ReportForm = ({ onSubmit }) => {
     }
   };
 
+  const handleMapLocation = (coords) => {
+      console.log('ReportForm: handleMapLocation coords =', coords);
+      console.log('ReportForm: formData.coordinates before =', formData.coordinates);
+    setFormData(prev => ({ ...prev, coordinates: coords }));
+      setTimeout(() => {
+        console.log('ReportForm: formData.coordinates after =', coords);
+      }, 100);
+    if (errors.coordinates) {
+      setErrors(prev => ({ ...prev, coordinates: '' }));
+    }
+  };
+
   const validateStep = (step) => {
     const newErrors = {};
     
@@ -161,6 +178,12 @@ const ReportForm = ({ onSubmit }) => {
         if (!formData.title.trim()) newErrors.title = 'Title is required';
         if (!formData.type) newErrors.type = 'Health type is required';
         if (!formData.severity) newErrors.severity = 'Severity level is required';
+        if (formData.publicHealthRisk) {
+          if (!formData.communityImpact) newErrors.communityImpact = 'Community impact area is required';
+          if (!formData.numberOfPeopleAffected || isNaN(Number(formData.numberOfPeopleAffected)) || Number(formData.numberOfPeopleAffected) <= 0) {
+            newErrors.numberOfPeopleAffected = 'Number of people affected is required and must be greater than 0';
+          }
+        }
         break;
       case 1:
         if (!formData.description.trim()) newErrors.description = 'Description is required';
@@ -169,7 +192,10 @@ const ReportForm = ({ onSubmit }) => {
         }
         break;
       case 2:
-        if (!formData.location.trim()) newErrors.location = 'Location is required';
+  if (!formData.location.trim()) newErrors.location = 'Location is required';
+  if (!formData.coordinates || !formData.coordinates.lat || !formData.coordinates.lng) {
+    newErrors.coordinates = 'Please select a location on the map. You must pick a location to submit a report.';
+  }
         if (!formData.city.trim()) newErrors.city = 'City is required';
         break;
       default:
@@ -181,9 +207,7 @@ const ReportForm = ({ onSubmit }) => {
   };
 
   const handleSubmit = () => {
-    console.log('Form validation passed, preparing to submit...');
-    console.log('Form data:', formData);
-    
+    setSubmitAttempted(true);
     if (validateStep(activeStep)) {
       // Transform form data to match backend schema
       const report = {
@@ -192,6 +216,10 @@ const ReportForm = ({ onSubmit }) => {
         title: formData.title,
         description: formData.description || formData.symptoms || 'Health report submitted',
         location: {
+          type: (formData.coordinates && formData.coordinates.lng && formData.coordinates.lat) ? 'Point' : undefined,
+          coordinates: (formData.coordinates && formData.coordinates.lng && formData.coordinates.lat)
+            ? [formData.coordinates.lng, formData.coordinates.lat]
+            : undefined,
           address: {
             street: formData.address || '',
             city: formData.city || '',
@@ -199,11 +227,7 @@ const ReportForm = ({ onSubmit }) => {
             country: 'US', // Default country
             zipCode: formData.zipCode || ''
           },
-          coordinates: {
-            latitude: 0, // Will be set by backend or map picker
-            longitude: 0
-          },
-          landmark: formData.location || ''
+          landmark: (formData.location && formData.location.landmark) || formData.location || ''
         },
         urgency: formData.requiresImmediateResponse ? 'emergency' : 'routine',
         status: 'pending',
@@ -223,10 +247,7 @@ const ReportForm = ({ onSubmit }) => {
           }
         }
       };
-      
-      console.log('Transformed report data:', report);
       onSubmit(report);
-      
       // Reset form
       setFormData({
         title: '',
@@ -258,6 +279,7 @@ const ReportForm = ({ onSubmit }) => {
       });
       setActiveStep(0);
       setErrors({});
+      setSubmitAttempted(false);
     }
   };
 
@@ -311,7 +333,6 @@ const ReportForm = ({ onSubmit }) => {
                 Select the type of health report and its priority level. Community health issues will be routed to appropriate public health authorities.
               </Alert>
             </Grid>
-            
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -323,7 +344,6 @@ const ReportForm = ({ onSubmit }) => {
                 placeholder="e.g., Flu Outbreak in Downtown, Mental Health Crisis, Water Contamination"
               />
             </Grid>
-            
             <Grid item xs={12} md={6}>
               <FormControl fullWidth error={!!errors.type}>
                 <InputLabel>Health Type</InputLabel>
@@ -339,7 +359,6 @@ const ReportForm = ({ onSubmit }) => {
                 {errors.type && <Typography color="error" variant="caption">{errors.type}</Typography>}
               </FormControl>
             </Grid>
-            
             <Grid item xs={12} md={6}>
               <FormControl fullWidth error={!!errors.severity}>
                 <InputLabel>Severity Level</InputLabel>
@@ -349,74 +368,50 @@ const ReportForm = ({ onSubmit }) => {
                   label="Severity Level"
                 >
                   {severityLevels.map((level) => (
-                    <MenuItem key={level} value={level}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Chip
-                          label={level}
-                          color={
-                            level === 'Critical' ? 'error' :
-                            level === 'High' ? 'error' :
-                            level === 'Medium' ? 'warning' : 'success'
-                          }
-                          size="small"
-                          variant="outlined"
-                        />
-                      </Box>
-                    </MenuItem>
+                    <MenuItem key={level} value={level}>{level}</MenuItem>
                   ))}
                 </Select>
                 {errors.severity && <Typography color="error" variant="caption">{errors.severity}</Typography>}
               </FormControl>
             </Grid>
-
             <Grid item xs={12}>
               <FormControlLabel
                 control={
                   <Checkbox
-                    checked={formData.isCommunityHealth}
-                    onChange={(e) => handleInputChange('isCommunityHealth', e.target.checked)}
+                    checked={formData.publicHealthRisk}
+                    onChange={(e) => handleInputChange('publicHealthRisk', e.target.checked)}
                   />
                 }
-                label="This is a community health issue affecting multiple people"
+                label="This poses a public health risk requiring immediate attention (Community Alert)"
               />
             </Grid>
-
-            {formData.isCommunityHealth && (
+            {formData.publicHealthRisk && (
               <>
                 <Grid item xs={12} md={6}>
-                  <FormControl fullWidth>
-                    <InputLabel>Community Impact Level</InputLabel>
+                  <FormControl fullWidth error={!!errors.communityImpact}>
+                    <InputLabel>Community Impact Area</InputLabel>
                     <Select
                       value={formData.communityImpact}
                       onChange={(e) => handleInputChange('communityImpact', e.target.value)}
-                      label="Community Impact Level"
+                      label="Community Impact Area"
                     >
                       {communityImpactLevels.map((level) => (
                         <MenuItem key={level} value={level}>{level}</MenuItem>
                       ))}
                     </Select>
+                    {errors.communityImpact && <Typography color="error" variant="caption">{errors.communityImpact}</Typography>}
                   </FormControl>
                 </Grid>
-                
                 <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
                     label="Number of People Affected"
+                    type="number"
                     value={formData.numberOfPeopleAffected}
                     onChange={(e) => handleInputChange('numberOfPeopleAffected', e.target.value)}
+                    error={!!errors.numberOfPeopleAffected}
+                    helperText={errors.numberOfPeopleAffected}
                     placeholder="e.g., 25, 100+"
-                  />
-                </Grid>
-
-                <Grid item xs={12}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={formData.publicHealthRisk}
-                        onChange={(e) => handleInputChange('publicHealthRisk', e.target.checked)}
-                      />
-                    }
-                    label="This poses a public health risk requiring immediate attention"
                   />
                 </Grid>
               </>
@@ -578,7 +573,6 @@ const ReportForm = ({ onSubmit }) => {
                 Location & Community Impact
               </Typography>
             </Grid>
-            
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -590,7 +584,48 @@ const ReportForm = ({ onSubmit }) => {
                 placeholder="Where did this health event occur?"
               />
             </Grid>
-            
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<LocationOn />}
+                  onClick={() => {
+                    if (navigator.geolocation) {
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          handleMapLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                        },
+                        (err) => {
+                          alert('Unable to fetch current location. Please allow location access.');
+                        }
+                      );
+                    } else {
+                      alert('Geolocation is not supported by your browser.');
+                    }
+                  }}
+                >
+                  Use Current Location
+                </Button>
+                <Typography variant="body2" color="text.secondary">
+                  Or pick a location on the map (required)
+                </Typography>
+              </Box>
+              <MapPicker
+                value={formData.coordinates}
+                onChange={handleMapLocation}
+                error={!!errors.coordinates}
+              />
+              {errors.coordinates && (
+                <Typography color="error" variant="caption" sx={{ fontWeight: 600 }}>
+                  {errors.coordinates}
+                </Typography>
+              )}
+              {!formData.coordinates && submitAttempted && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  Please select a location on the map to continue. Location is required for all health reports.
+                </Alert>
+              )}
+            </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -600,7 +635,6 @@ const ReportForm = ({ onSubmit }) => {
                 placeholder="Street address..."
               />
             </Grid>
-            
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -611,7 +645,6 @@ const ReportForm = ({ onSubmit }) => {
                 helperText={errors.city}
               />
             </Grid>
-            
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -620,7 +653,6 @@ const ReportForm = ({ onSubmit }) => {
                 onChange={(e) => handleInputChange('state', e.target.value)}
               />
             </Grid>
-            
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -629,7 +661,6 @@ const ReportForm = ({ onSubmit }) => {
                 onChange={(e) => handleInputChange('zipCode', e.target.value)}
               />
             </Grid>
-            
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
@@ -639,7 +670,6 @@ const ReportForm = ({ onSubmit }) => {
                 placeholder="Your contact number..."
               />
             </Grid>
-            
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
@@ -649,7 +679,6 @@ const ReportForm = ({ onSubmit }) => {
                 placeholder="Emergency contact person..."
               />
             </Grid>
-
             {formData.isCommunityHealth && (
               <>
                 <Grid item xs={12}>
@@ -658,7 +687,6 @@ const ReportForm = ({ onSubmit }) => {
                     Community Health Reporting Options
                   </Typography>
                 </Grid>
-
                 <Grid item xs={12} md={6}>
                   <FormControlLabel
                     control={
@@ -670,7 +698,6 @@ const ReportForm = ({ onSubmit }) => {
                     label="Submit anonymously (recommended for community reports)"
                   />
                 </Grid>
-
                 <Grid item xs={12} md={6}>
                   <FormControlLabel
                     control={
@@ -755,7 +782,15 @@ const ReportForm = ({ onSubmit }) => {
                 {formData.symptoms && (
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" color="text.secondary">Symptoms</Typography>
-                    <Typography variant="body1">{formData.symptoms}</Typography>
+                    <Typography variant="body1">
+                      {Array.isArray(formData.symptoms)
+                        ? formData.symptoms.map(symptom =>
+                            typeof symptom === 'string'
+                              ? symptom
+                              : symptom.name || 'Unknown symptom'
+                          ).join(', ')
+                        : formData.symptoms}
+                    </Typography>
                   </Grid>
                 )}
                 

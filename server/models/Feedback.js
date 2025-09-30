@@ -52,23 +52,34 @@ const feedbackSchema = new mongoose.Schema({
     }
   },
   
+
   // Associated entities
   patient: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  
+
+  // Feedback can be for any service: doctor, campaign, facility, general, etc.
+  serviceType: {
+    type: String,
+    enum: ['doctor', 'campaign', 'facility', 'general'],
+    default: 'general',
+    required: true
+  },
+  serviceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null
+  },
+
   healthcareProvider: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  
   healthReport: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'HealthReport'
   },
-  
   consultation: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Consultation'

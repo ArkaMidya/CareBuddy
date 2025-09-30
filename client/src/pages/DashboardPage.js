@@ -32,6 +32,7 @@ import {
   LocalHospital,
   VolunteerActivism,
   Campaign,
+  Warning,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -88,6 +89,7 @@ const DashboardPage = () => {
       { title: 'Find Health Resources', path: '/resources', icon: <LocalHospital /> },
       { title: 'Book Consultation', path: '/consultations', icon: <HealthAndSafety /> },
       { title: 'Health Education', path: '/education', icon: <School /> },
+  { title: 'View Emergencies', path: '/emergency-dashboard', icon: <Warning /> },
     ];
 
     // Add role-specific actions

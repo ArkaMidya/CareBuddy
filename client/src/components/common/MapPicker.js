@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Box, Typography } from '@mui/material';
+import { TextField, IconButton, InputAdornment, CircularProgress, List, ListItem, ListItemText, Paper } from '@mui/material';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 // Ensure marker images load correctly
@@ -10,6 +11,9 @@ const MapPicker = ({ value, onChange, defaultCenter = { lat: 20.5937, lng: 78.96
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const idRef = useRef(`mappicker-${Math.random().toString(36).slice(2, 9)}`);
+  const [search, setSearch] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [results, setResults] = useState([]);
 
   // apply default icon (fixes missing pin issue)
   useEffect(() => {
@@ -24,6 +28,41 @@ const MapPicker = ({ value, onChange, defaultCenter = { lat: 20.5937, lng: 78.96
     L.Marker.prototype.options.icon = DefaultIcon;
   }, []);
 
+  // Geocode search
+  const handleSearch = async () => {
+    if (!search.trim()) return;
+    setSearching(true);
+    setResults([]);
+    try {
+      const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(search)}`);
+      const data = await resp.json();
+      setResults(data);
+    } catch (e) {
+      setResults([]);
+    }
+    setSearching(false);
+  };
+
+  const handleResultClick = (result) => {
+    const lat = parseFloat(result.lat);
+    const lng = parseFloat(result.lon);
+    if (mapRef.current) {
+      mapRef.current.setView([lat, lng], 17);
+      if (markerRef.current) {
+        markerRef.current.setLatLng([lat, lng]);
+      } else {
+        const icon = createPinIcon();
+        markerRef.current = L.marker([lat, lng], { draggable: true, icon }).addTo(mapRef.current);
+        markerRef.current.on('dragend', function (ev) {
+          const pos = ev.target.getLatLng();
+          onChange && onChange({ lat: pos.lat, lng: pos.lng });
+        });
+      }
+      onChange && onChange({ lat, lng });
+    }
+    setResults([]);
+    setSearch('');
+  };
   const createPinIcon = () => {
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
@@ -34,7 +73,7 @@ const MapPicker = ({ value, onChange, defaultCenter = { lat: 20.5937, lng: 78.96
 
   useEffect(() => {
     if (!mapRef.current) {
-      mapRef.current = L.map(idRef.current, { center: [defaultCenter.lat, defaultCenter.lng], zoom, scrollWheelZoom: false });
+      mapRef.current = L.map(idRef.current, { center: [defaultCenter.lat, defaultCenter.lng], zoom, scrollWheelZoom: true, dragging: true });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
       }).addTo(mapRef.current);

@@ -1,3 +1,4 @@
+// ...existing code...
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -109,6 +110,7 @@ export const reportsService = {
     }
   },
 
+
   // Undo resolution of a report
   async undoResolution(id) {
     try {
@@ -116,6 +118,17 @@ export const reportsService = {
       return response.data;
     } catch (error) {
       console.error('Error undoing resolution:', error);
+      throw error;
+    }
+  },
+
+  // Get IDs of reports that have open escalations
+  async getEscalatedReportIds() {
+    try {
+      const response = await api.get('/reports/escalated');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching escalated report IDs:', error);
       throw error;
     }
   }

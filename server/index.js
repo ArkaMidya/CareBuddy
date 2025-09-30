@@ -17,6 +17,8 @@ const campaignRoutes = require('./routes/campaigns');
 const feedbackRoutes = require('./routes/feedback');
 const referralRoutes = require('./routes/referrals');
 
+const emergenciesRouter = require('./routes/emergencies');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -80,8 +82,10 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/referrals', referralRoutes);
 const usersRoutes = require('./routes/users');
 app.use('/api/users', usersRoutes);
+app.use('/api/emergencies', emergenciesRouter);
 
 // Error handling middleware
+app.use('/api/reports', require('./routes/escalatedReports'));
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
@@ -108,8 +112,11 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' ? ['https://carebody.org', 'https://www.carebody.org'] : ['http://localhost:3000'],
-    methods: ['GET', 'POST']
+    origin: process.env.NODE_ENV === 'production' 
+      ? ['https://carebody.org', 'https://www.carebody.org'] 
+      : '*', // Allow all origins in development
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 

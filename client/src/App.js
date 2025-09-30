@@ -1,4 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { io } from 'socket.io-client';
+import { useAuth } from './contexts/AuthContext';
+import { useNotification } from './contexts/NotificationContext';
 import { Routes, Route } from 'react-router-dom';
 import { Box, Container, ThemeProvider, CssBaseline } from '@mui/material';
 import { AuthProvider } from './contexts/AuthContext';
@@ -24,12 +27,33 @@ import CampaignDetailsPage from './pages/CampaignDetailsPage';
 import ProfilePage from './pages/ProfilePage';
 import HealthReportPage from './pages/HealthReportPage';
 import FeedbackReferralPage from './pages/FeedbackReferralPage';
+
 import NotFoundPage from './pages/NotFoundPage';
 import ManageUsersPage from './pages/ManageUsersPage';
 import NotificationsPage from './pages/NotificationsPage';
+import EmergencyDashboardPage from './pages/EmergencyDashboardPage';
+import EmergencyPage from './pages/EmergencyPage';
 
 // Protected Route Component
 import ProtectedRoute from './components/auth/ProtectedRoute';
+
+// Global escalation notification listener (must be inside providers)
+function GlobalEscalationListener() {
+  const { user } = useAuth();
+  const { showInfo } = useNotification();
+  useEffect(() => {
+    if (!user) return;
+  const socket = io('http://localhost:5000', { transports: ['websocket'], auth: { token: localStorage.getItem('token') } });
+    socket.emit('joinRoom', String(user._id || user.id));
+    socket.on('emergency:myupdate', (data) => {
+      showInfo(`Your escalation "${data?.title || 'Untitled'}" status changed to: ${data?.status}`);
+    });
+    return () => {
+      socket.disconnect();
+    };
+  }, [user]);
+  return null;
+}
 
 function App() {
   return (
@@ -37,6 +61,7 @@ function App() {
       <CssBaseline />
       <AuthProvider>
         <NotificationProvider>
+          <GlobalEscalationListener />
           <Box sx={{ 
             display: 'flex', 
             flexDirection: 'column', 
@@ -113,6 +138,17 @@ function App() {
                     </ProtectedRoute>
                   } />
                   
+                  {/* Emergency Escalation Dashboard (Protected) */}
+                  <Route path="/emergency-dashboard" element={
+                    <ProtectedRoute>
+                      <EmergencyDashboardPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/emergency" element={
+                    <ProtectedRoute>
+                      <EmergencyPage />
+                    </ProtectedRoute>
+                  } />
                   {/* 404 Route */}
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>

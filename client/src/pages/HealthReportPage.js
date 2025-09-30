@@ -18,6 +18,7 @@ import {
 } from '@mui/icons-material';
 import ReportForm from '../components/health/ReportForm';
 import ReportsList from '../components/health/ReportsList';
+import { useAuth } from '../contexts/AuthContext';
 import MapView from '../components/health/MapView';
 import HealthMetrics from '../components/health/HealthMetrics';
 import { reportsService } from '../services/reportsService';
@@ -25,32 +26,34 @@ import { reportsService } from '../services/reportsService';
 
 
 const HealthReportPage = () => {
+  const { user } = useAuth();
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState(0);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch reports from backend on component mount
-  useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await reportsService.getReports();
-        if (response.success) {
-          setReports(response.data.reports || []);
-        } else {
-          setError('Failed to fetch reports');
-        }
-      } catch (error) {
-        console.error('Error fetching reports:', error);
-        setError('Failed to fetch reports. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
 
+  // Fetch reports from backend
+  const fetchReports = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await reportsService.getReports();
+      if (response.success) {
+        setReports(response.data.reports || []);
+      } else {
+        setError('Failed to fetch reports');
+      }
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+      setError('Failed to fetch reports. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchReports();
   }, []);
 
@@ -68,13 +71,17 @@ const HealthReportPage = () => {
         setReports(prev => [response.data.report, ...prev]);
         setActiveTab(1); // Switch to reports list tab
       } else {
-        setError('Failed to submit report');
+        setError(response.message || 'Failed to submit report');
       }
     } catch (error) {
       console.error('Error submitting report:', error);
       if (error.response) {
         console.error('Error response data:', error.response.data);
-        setError(`Failed to submit report: ${error.response.data.message || 'Validation error'}`);
+        let errMsg = `Failed to submit report: ${error.response.data.message || 'Validation error'}`;
+        if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
+          errMsg += '\n' + error.response.data.errors.map(e => `- ${e.msg} (${e.param})`).join('\n');
+        }
+        setError(errMsg);
       } else {
         setError('Failed to submit report. Please try again.');
       }
@@ -111,12 +118,16 @@ const HealthReportPage = () => {
       const response = await reportsService.deleteReport(reportId);
       if (response.success) {
         setReports(prev => prev.filter(r => (r._id || r.id) !== reportId));
+        setError(null);
+        window.alert('Report deleted successfully.');
       } else {
         setError('Failed to delete report');
+        window.alert('Failed to delete report.');
       }
     } catch (error) {
       console.error('Error deleting report:', error);
       setError('Failed to delete report. Please try again.');
+      window.alert('Error deleting report. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -161,12 +172,30 @@ const HealthReportPage = () => {
               : r
           )
         );
+        setError(null);
+        window.alert('Report marked as resolved.');
       } else {
-        setError('Failed to resolve report');
+        setError(response.message || 'Failed to resolve report');
+        window.alert(response.message || 'Failed to resolve report.');
       }
     } catch (error) {
       console.error('Error resolving report:', error);
-      setError('Failed to resolve report. Please try again.');
+      let backendMsg = error?.response?.data?.message || error?.response?.data?.error || error.message || 'Failed to resolve report. Please try again.';
+      // Check for auth/permission errors
+      if (
+        backendMsg.toLowerCase().includes('permission') ||
+        backendMsg.toLowerCase().includes('unauthorized') ||
+        backendMsg.toLowerCase().includes('jwt') ||
+        backendMsg.toLowerCase().includes('token')
+      ) {
+        setError('Authentication or permission error. Please log in with the correct role and try again.');
+        window.alert('Authentication or permission error. Please log in with the correct role and try again.');
+        // Optionally, redirect to login page:
+        // window.location.href = '/login';
+      } else {
+        setError(backendMsg);
+        window.alert('Error resolving report: ' + backendMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -225,7 +254,7 @@ const HealthReportPage = () => {
           onUndo={handleReportUndo}
           onView={handleReportView}
           onEdit={handleReportEdit}
-          userRole="admin"
+          userRole={user?.role || 'user'}
         />
       );
     case 2:
@@ -234,6 +263,8 @@ const HealthReportPage = () => {
           reports={reports}
           onReportUpdate={handleReportUpdate}
           onReportDelete={handleReportDelete}
+          onOpenReportForm={() => setActiveTab(0)}
+          onRefresh={fetchReports}
         />
       );
     case 3:

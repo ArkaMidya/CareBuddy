@@ -22,7 +22,9 @@ import {
   useTheme,
   alpha,
 } from '@mui/material';
-import { VideoCall, CalendarToday } from '@mui/icons-material';
+import { VideoCall, CalendarToday, Add } from '@mui/icons-material';
+import { Checkbox } from '@mui/material';
+import { referralService } from '../services/referralService';
 import userService from '../services/userService';
 import consultationService from '../services/consultationService';
 import CountdownTimer from '../components/common/CountdownTimer';
@@ -33,6 +35,22 @@ import { useNavigate } from 'react-router-dom';
 
 
 const ConsultationsPage = () => {
+  // Referral dialog state (must be inside component)
+  const [referralDialogOpen, setReferralDialogOpen] = useState(false);
+  const [selectedReferral, setSelectedReferral] = useState(null);
+  const [referralForm, setReferralForm] = useState({
+    title: '',
+    description: '',
+    type: 'specialist',
+    specialty: '',
+    priority: 'routine',
+    urgency: 'medium',
+    clinicalReason: '',
+    patient: '',
+    isEmergency: false
+  });
+  const [userRole, setUserRole] = useState('user');
+
   const [doctors, setDoctors] = useState([]);
   const [specializationFilter, setSpecializationFilter] = useState('');
   const token = localStorage.getItem('token');
@@ -47,6 +65,38 @@ const ConsultationsPage = () => {
   const [openPrescription, setOpenPrescription] = useState(false);
   const [prescriptionForm, setPrescriptionForm] = useState({ medications: [{ name: '', dosage: '', frequency: '', duration: '' }], notes: '' });
   const [currentConsultationForPrescription, setCurrentConsultationForPrescription] = useState(null);
+
+  useEffect(() => {
+    // Fetch user role from localStorage or context if available
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user && user.role) setUserRole(user.role);
+  }, []);
+
+  const handleReferralSubmit = async () => {
+    try {
+      const payload = { ...referralForm };
+      if (userRole !== 'doctor' && userRole !== 'admin') delete payload.isEmergency;
+      const response = await referralService.createReferral(payload);
+      if (response.success) {
+        setReferralDialogOpen(false);
+        setReferralForm({
+          title: '',
+          description: '',
+          type: 'specialist',
+          specialty: '',
+          priority: 'routine',
+          urgency: 'medium',
+          clinicalReason: '',
+          patient: '',
+          isEmergency: false
+        });
+        notify.showSuccess('Referral created!');
+      }
+    } catch (error) {
+      console.error('Error creating referral:', error);
+      notify.showError('Failed to create referral. Please try again.');
+    }
+  };
 
   const nextUpcomingId = useMemo(() => {
     const now = new Date();
@@ -371,6 +421,156 @@ const ConsultationsPage = () => {
 
   return (
     <Container maxWidth="lg">
+      <Box display="flex" justifyContent="flex-end" mb={2}>
+      </Box>
+      {/* Referral Dialog */}
+      <Dialog 
+        open={referralDialogOpen} 
+        onClose={() => setReferralDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {selectedReferral ? 'View Referral' : 'Create Referral'}
+        </DialogTitle>
+        <DialogContent>
+          {selectedReferral ? (
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                {selectedReferral.title}
+              </Typography>
+              <Box display="flex" alignItems="center" gap={1} mb={2}>
+                <Chip label={selectedReferral.type} />
+                <Chip label={selectedReferral.status} />
+                <Chip label={selectedReferral.priority} />
+              </Box>
+              <Typography variant="body1" paragraph>
+                {selectedReferral.description}
+              </Typography>
+              <Typography variant="subtitle2" gutterBottom>
+                Clinical Reason:
+              </Typography>
+              <Typography variant="body2" color="textSecondary" paragraph>
+                {selectedReferral.clinicalReason}
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ pt: 1 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Title"
+                    value={referralForm.title}
+                    onChange={(e) => setReferralForm({...referralForm, title: e.target.value})}
+                    margin="normal"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Description"
+                    value={referralForm.description}
+                    onChange={(e) => setReferralForm({...referralForm, description: e.target.value})}
+                    margin="normal"
+                    multiline
+                    rows={3}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth margin="normal">
+                    <InputLabel>Type</InputLabel>
+                    <Select
+                      value={referralForm.type}
+                      onChange={(e) => setReferralForm({...referralForm, type: e.target.value})}
+                      label="Type"
+                    >
+                      <MenuItem value="specialist">Specialist</MenuItem>
+                      <MenuItem value="diagnostic">Diagnostic</MenuItem>
+                      <MenuItem value="treatment">Treatment</MenuItem>
+                      <MenuItem value="follow_up">Follow-up</MenuItem>
+                      <MenuItem value="emergency">Emergency</MenuItem>
+                      <MenuItem value="preventive">Preventive</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Specialty"
+                    value={referralForm.specialty}
+                    onChange={(e) => setReferralForm({...referralForm, specialty: e.target.value})}
+                    margin="normal"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth margin="normal">
+                    <InputLabel>Priority</InputLabel>
+                    <Select
+                      value={referralForm.priority}
+                      onChange={(e) => setReferralForm({...referralForm, priority: e.target.value})}
+                      label="Priority"
+                    >
+                      <MenuItem value="routine">Routine</MenuItem>
+                      <MenuItem value="urgent">Urgent</MenuItem>
+                      <MenuItem value="emergency">Emergency</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth margin="normal">
+                    <InputLabel>Urgency</InputLabel>
+                    <Select
+                      value={referralForm.urgency}
+                      onChange={(e) => setReferralForm({...referralForm, urgency: e.target.value})}
+                      label="Urgency"
+                    >
+                      <MenuItem value="low">Low</MenuItem>
+                      <MenuItem value="medium">Medium</MenuItem>
+                      <MenuItem value="high">High</MenuItem>
+                      <MenuItem value="critical">Critical</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Clinical Reason"
+                    value={referralForm.clinicalReason}
+                    onChange={(e) => setReferralForm({...referralForm, clinicalReason: e.target.value})}
+                    margin="normal"
+                    multiline
+                    rows={3}
+                  />
+                </Grid>
+                {['doctor', 'admin'].includes(userRole) && (
+                  <Grid item xs={12}>
+                    <FormControl fullWidth margin="normal">
+                      <Box display="flex" alignItems="center" gap={2}>
+                        <Typography>Mark as Emergency</Typography>
+                        <Checkbox
+                          checked={referralForm.isEmergency}
+                          onChange={e => setReferralForm({ ...referralForm, isEmergency: e.target.checked })}
+                        />
+                      </Box>
+                    </FormControl>
+                  </Grid>
+                )}
+              </Grid>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReferralDialogOpen(false)}>
+            {selectedReferral ? 'Close' : 'Cancel'}
+          </Button>
+          {!selectedReferral && (
+            <Button variant="contained" onClick={handleReferralSubmit}>
+              Create Referral
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
       <Box sx={{ 
         py: 3,
         position: 'relative',

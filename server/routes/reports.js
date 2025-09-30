@@ -1,92 +1,39 @@
+
+
 const express = require('express');
-const { body, validationResult, query } = require('express-validator');
+const router = express.Router();
+const { body, validationResult } = require('express-validator');
 const HealthReport = require('../models/HealthReport');
 const { authenticateToken, authorizeRole, optionalAuth } = require('../middleware/auth');
 
-const router = express.Router();
-
 // @route   GET /api/reports
-// @desc    Get health reports with filtering
-// @access  Private (Health workers, providers, admins)
-router.get('/', [
-  authenticateToken,
-  query('type').optional().isIn(['illness', 'outbreak', 'mental_health_crisis', 'injury', 'environmental_hazard', 'medication_shortage', 'other']),
-  query('status').optional().isIn(['pending', 'investigating', 'confirmed', 'resolved', 'false_alarm']),
-  query('priority').optional().isIn(['low', 'medium', 'high', 'critical']),
-  query('lat').optional().isFloat(),
-  query('lng').optional().isFloat(),
-  query('radius').optional().isFloat(),
-  query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 100 })
-], async (req, res) => {
+// @desc    Get all health reports (with optional filtering)
+// @access  Private
+router.get('/', optionalAuth, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
+    const filters = {};
+    // Optional filters from query params
+    if (req.query.status) filters.status = req.query.status;
+    if (req.query.severity) filters.severity = req.query.severity;
+    if (req.query.type) filters.type = req.query.type;
+    if (req.query.urgency) filters.urgency = req.query.urgency;
+    // Add more filters as needed
 
-    const {
-      type,
-      status,
-      priority,
-      lat,
-      lng,
-      radius = 10,
-      page = 1,
-      limit = 20
-    } = req.query;
-
-    // Build query
-    const query = {};
-    
-    if (type) query.type = type;
-    if (status) query.status = status;
-    if (priority) query.priority = priority;
-
-   // Allow authenticated users to view reports. Patients can now view all reports.
-   if (!['health_worker', 'doctor', 'ngo', 'admin', 'patient'].includes(req.user.role)) {
-     return res.status(403).json({ success: false, message: 'Not authorized to view reports' });
-   }
-
-    let reports;
-    
-    // If coordinates provided, find nearby reports
-    if (lat && lng) {
-      reports = await HealthReport.findNearby(parseFloat(lat), parseFloat(lng), parseFloat(radius));
-    } else {
-      reports = await HealthReport.find(query)
-        .populate('reporter', 'firstName lastName email phone')
-        .populate('assignedTo.user', 'firstName lastName email phone')
-        .sort({ priority: -1, createdAt: -1 })
-        .limit(parseInt(limit))
-        .skip((parseInt(page) - 1) * parseInt(limit));
-    }
-
-    // Get total count for pagination
-    const total = await HealthReport.countDocuments(query);
+    const reports = await HealthReport.find(filters)
+      .populate('reporter', 'firstName lastName email phone')
+      .populate('assignedTo.user', 'firstName lastName email phone')
+      .populate('actions.takenBy', 'firstName lastName email phone')
+      .sort({ createdAt: -1 });
 
     res.json({
       success: true,
-      data: {
-        reports,
-        pagination: {
-          current: parseInt(page),
-          total: Math.ceil(total / parseInt(limit)),
-          hasNext: parseInt(page) * parseInt(limit) < total,
-          hasPrev: parseInt(page) > 1
-        }
-      }
+      data: { reports }
     });
-
   } catch (error) {
-    console.error('Get reports error:', error);
+    console.error('Get all reports error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get reports',
+      message: 'Failed to fetch reports',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
@@ -428,40 +375,48 @@ router.put('/:id/resolve', [
 ], async (req, res) => {
   try {
     const report = await HealthReport.findById(req.params.id);
-    
     if (!report) {
       return res.status(404).json({
         success: false,
         message: 'Report not found'
       });
     }
-
+    if (report.status === 'resolved') {
+      return res.status(400).json({
+        success: false,
+        message: 'Report is already resolved'
+      });
+    }
     report.status = 'resolved';
     report.resolvedAt = new Date();
     report.resolvedBy = req.user._id;
-    
     await report.save();
-
-    // Populate for response
     await report.populate('reporter', 'firstName lastName email phone');
     await report.populate('resolvedBy', 'firstName lastName email phone');
-
     res.json({
       success: true,
       message: 'Report marked as resolved',
       data: { report }
     });
-
   } catch (error) {
     console.error('Resolve report error:', error);
+    let errMsg = 'Failed to resolve report';
+    if (error.name === 'CastError') {
+      errMsg = 'Invalid report ID';
+    } else if (error.name === 'ValidationError') {
+      errMsg = 'Validation error: ' + error.message;
+    } else if (error.code === 11000) {
+      errMsg = 'Duplicate key error';
+    } else if (error.message) {
+      errMsg = error.message;
+    }
     res.status(500).json({
       success: false,
-      message: 'Failed to resolve report',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      message: errMsg,
+      error: error.message
     });
   }
 });
-
 // @route   PUT /api/reports/:id/undo-resolution
 // @desc    Undo resolution of a report
 // @access  Private (Health workers, providers, admins)

@@ -93,6 +93,8 @@ router.post('/', [
   body('title').trim().isLength({ min: 5, max: 200 }).withMessage('Title must be between 5 and 200 characters'),
   body('description').trim().isLength({ min: 10, max: 1000 }).withMessage('Description must be between 10 and 1000 characters'),
   body('type').isIn(['care_quality', 'wait_time', 'communication', 'facility', 'medication', 'follow_up', 'general']).withMessage('Invalid feedback type'),
+  body('serviceType').isIn(['doctor', 'campaign', 'facility', 'general']).withMessage('Invalid service type'),
+  body('serviceId').optional().isMongoId().withMessage('Invalid service ID'),
   body('rating.overall').isInt({ min: 1, max: 5 }).withMessage('Overall rating must be between 1 and 5'),
   body('rating.careQuality').optional().isInt({ min: 1, max: 5 }),
   body('rating.communication').optional().isInt({ min: 1, max: 5 }),

@@ -28,16 +28,22 @@ const healthReportSchema = new mongoose.Schema({
     trim: true
   },
   location: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      required: false,
+      default: 'Point'
+    },
+    coordinates: {
+      type: [Number], // [lng, lat]
+      required: false
+    },
     address: {
       street: String,
       city: String,
       state: String,
       country: String,
       zipCode: String
-    },
-    coordinates: {
-      latitude: Number,
-      longitude: Number
     },
     landmark: String
   },
@@ -166,6 +172,10 @@ const healthReportSchema = new mongoose.Schema({
     default: false
   },
   verificationNotes: String,
+  resolvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   resolvedAt: Date,
   resolutionNotes: String
 }, {

@@ -57,6 +57,14 @@ router.get('/', [
     } else if (req.user.role === 'patient') {
       // Patients can see referrals where they are the patient
       query.patient = req.user._id;
+      console.log('DEBUG: Patient access - user._id:', req.user._id, 'query:', query);
+    } else {
+      console.log('DEBUG: Forbidden role:', req.user.role);
+      return res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions',
+        error: `Role ${req.user.role} is not allowed to view referrals.`
+      });
     }
 
     const referrals = await Referral.find(query)
@@ -111,7 +119,8 @@ router.post('/', [
   body('clinicalReason').trim().notEmpty().withMessage('Clinical reason is required'),
   body('deadline').optional().isISO8601().toDate().withMessage('Invalid deadline date'),
   body('healthReport').optional().isMongoId().withMessage('Invalid health report ID'),
-  body('consultation').optional().isMongoId().withMessage('Invalid consultation ID')
+  body('consultation').optional().isMongoId().withMessage('Invalid consultation ID'),
+  body('isEmergency').optional().isBoolean()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -123,10 +132,49 @@ router.post('/', [
       });
     }
 
-    const referralData = {
+
+    // Only doctor or admin can flag as emergency
+    let isEmergency = false;
+    if (req.body.isEmergency && ['doctor', 'admin'].includes(req.user.role)) {
+      isEmergency = true;
+    }
+
+    let referralData = {
       ...req.body,
       referringProvider: req.user._id
     };
+
+    // If emergency, find nearest hospital/clinic and assign
+    if (isEmergency || req.body.type === 'emergency' || req.body.priority === 'emergency') {
+      const User = require('../models/User');
+      const HealthResource = require('../models/HealthResource');
+      const patient = await User.findById(req.body.patient);
+      if (patient && patient.address && patient.address.coordinates) {
+        // Find nearest hospital/clinic with 24x7 emergency
+        const nearest = await HealthResource.findOne({
+          type: { $in: ['hospital', 'clinic'] },
+          'availability.emergency24x7': true,
+          'location.coordinates': { $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates: [patient.address.coordinates.longitude, patient.address.coordinates.latitude]
+            },
+            $maxDistance: 50000 // 50km radius
+          }}
+        });
+        if (nearest) {
+          referralData.referredToFacility = {
+            name: nearest.title,
+            address: nearest.location.address,
+            phone: nearest.contact.phone ? nearest.contact.phone[0] : '',
+            email: nearest.contact.email ? nearest.contact.email[0] : ''
+          };
+        }
+      }
+      referralData.priority = 'emergency';
+      referralData.urgency = 'critical';
+      referralData.type = 'emergency';
+    }
 
     const referral = new Referral(referralData);
     await referral.save();

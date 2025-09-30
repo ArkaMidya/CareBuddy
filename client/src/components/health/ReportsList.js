@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import reportsService from '../../services/reportsService';
+import { useAuth } from '../../contexts/AuthContext';
+import axios from 'axios';
 import {
   Card,
   CardContent,
@@ -23,7 +26,8 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemIcon
+  ListItemIcon,
+  Tooltip
 } from '@mui/material';
 import {
   Visibility,
@@ -57,6 +61,7 @@ const ReportsList = ({
   userRole = 'user'
 }) => {
   const [filteredReports, setFilteredReports] = useState(reports);
+  const [escalatedIds, setEscalatedIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [severityFilter, setSeverityFilter] = useState('all');
@@ -66,18 +71,51 @@ const ReportsList = ({
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
+  // Emergency Escalation State
+  const { user } = useAuth();
+  const [escalateDialogOpen, setEscalateDialogOpen] = useState(false);
+  const [escalationReason, setEscalationReason] = useState('');
+  const [escalationLoading, setEscalationLoading] = useState(false);
+  const [escalationError, setEscalationError] = useState('');
+  const [escalationSuccess, setEscalationSuccess] = useState(false);
+  const [emergencyType, setEmergencyType] = useState('General');
+
   // Check if user has admin privileges
-  const hasAdminPrivileges = ['admin', 'doctor', 'health_worker'].includes(userRole);
+  const hasAdminPrivileges = ['admin', 'doctor'].includes(userRole);
+
+  useEffect(() => {
+    // Fetch escalated report IDs on mount
+    async function fetchEscalated() {
+      try {
+        const result = await reportsService.getEscalatedReportIds();
+        setEscalatedIds(result.escalated || []);
+      } catch (e) {
+        setEscalatedIds([]);
+      }
+    }
+    fetchEscalated();
+  }, []);
 
   useEffect(() => {
     let filtered = [...reports];
+    // Mark escalated reports
+    filtered = filtered.map(r => {
+      const id = String(r._id || r.id);
+      if (id === 'escalated') {
+        console.warn('Invalid report id detected:', id, r);
+        return { ...r, escalated: false };
+      }
+      const isEscalated = escalatedIds.includes(id);
+      console.log('Report', id, 'escalated:', isEscalated);
+      return { ...r, escalated: isEscalated };
+    });
+    console.log('Escalated IDs:', escalatedIds);
 
     // Apply search filter
     if (searchTerm) {
       filtered = filtered.filter(report => {
         const titleMatch = report.title?.toLowerCase().includes(searchTerm.toLowerCase());
         const descriptionMatch = report.description?.toLowerCase().includes(searchTerm.toLowerCase());
-        
         // Handle location search for both string and object formats
         let locationMatch = false;
         if (typeof report.location === 'string') {
@@ -88,25 +126,20 @@ const ReportsList = ({
           locationMatch = city.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          landmark.toLowerCase().includes(searchTerm.toLowerCase());
         }
-        
         return titleMatch || descriptionMatch || locationMatch;
       });
     }
-
     // Apply status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(report => report.status === statusFilter);
     }
-
     // Apply severity filter
     if (severityFilter !== 'all') {
       filtered = filtered.filter(report => report.severity === severityFilter);
     }
-
     // Apply sorting
     filtered.sort((a, b) => {
       let aValue, bValue;
-
       switch (sortBy) {
         case 'date':
           aValue = new Date(a.createdAt || a.date);
@@ -128,18 +161,17 @@ const ReportsList = ({
           aValue = a.title || '';
           bValue = b.title || '';
       }
-
       if (sortOrder === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
         return aValue < bValue ? 1 : -1;
       }
     });
-
     setFilteredReports(filtered);
-  }, [reports, searchTerm, statusFilter, severityFilter, sortBy, sortOrder]);
+  }, [reports, searchTerm, statusFilter, severityFilter, sortBy, sortOrder, escalatedIds]);
 
   const getSeverityColor = (severity) => {
+
     switch (severity?.toLowerCase()) {
       case 'high':
         return 'error';
@@ -210,6 +242,98 @@ const ReportsList = ({
   const handleCloseEditDialog = () => {
     setEditDialogOpen(false);
     setSelectedReport(null);
+  };
+
+  // Emergency Escalation Handlers
+  const handleOpenEscalateDialog = (report) => {
+    setSelectedReport(report);
+    setEscalationReason('');
+    setEscalationError('');
+    setEscalationSuccess(false);
+    setEmergencyType('General');
+    setEscalateDialogOpen(true);
+  };
+
+  const handleCloseEscalateDialog = () => {
+    setEscalateDialogOpen(false);
+    setSelectedReport(null);
+    setEscalationReason('');
+    setEscalationError('');
+    setEscalationSuccess(false);
+  };
+
+  // Helper to check if selected report has a valid location for escalation
+
+  const handleSubmitEscalation = async () => {
+  // Debug: print selected report location before escalation
+  console.log('Escalation: selectedReport.location =', selectedReport.location);
+    if (!escalationReason.trim()) {
+      setEscalationError('Please provide a reason for escalation.');
+      return;
+    }
+    setEscalationLoading(true);
+    setEscalationError('');
+    try {
+      // Ensure location is in GeoJSON format
+      let geoLocation = null;
+      if (selectedReport.location && selectedReport.location.coordinates && Array.isArray(selectedReport.location.coordinates)) {
+        geoLocation = {
+          type: 'Point',
+          coordinates: selectedReport.location.coordinates
+        };
+      } else if (selectedReport.location && selectedReport.location.lng && selectedReport.location.lat) {
+        geoLocation = {
+          type: 'Point',
+          coordinates: [selectedReport.location.lng, selectedReport.location.lat]
+        };
+      }
+      if (!geoLocation || !Array.isArray(geoLocation.coordinates) || geoLocation.coordinates.length !== 2 ||
+          typeof geoLocation.coordinates[0] !== 'number' || typeof geoLocation.coordinates[1] !== 'number') {
+        setEscalationError('Cannot escalate: This report does not have a valid location. Please ensure a location is set.');
+        setEscalationLoading(false);
+        return;
+      }
+      await axios.post('/api/emergencies', {
+        report_id: selectedReport._id || selectedReport.id,
+        reason: escalationReason,
+        location: geoLocation,
+        severity: selectedReport.severity,
+        description: selectedReport.description,
+        title: selectedReport.title,
+        reporter_id: user?._id || user?.id,
+        emergency_type: emergencyType,
+      });
+      setEscalationSuccess(true);
+      // Refresh escalated IDs so the button disables immediately
+      try {
+        const result = await reportsService.getEscalatedReportIds();
+        setEscalatedIds(result.escalated || []);
+      } catch (e) {}
+      setTimeout(() => {
+        handleCloseEscalateDialog();
+      }, 1200);
+    } catch (err) {
+      let msg = 'Failed to escalate. Please try again.';
+      if (err.response && err.response.data && err.response.data.error) {
+        msg = `Failed to escalate: ${err.response.data.error}`;
+      }
+      setEscalationError(msg);
+    } finally {
+      setEscalationLoading(false);
+    }
+  };
+
+  // Helper to check if selected report has a valid location for escalation
+  const isValidEscalationLocation = (report) => {
+    if (!report) return false;
+    if (report.location && Array.isArray(report.location.coordinates)) {
+      const coords = report.location.coordinates;
+      return coords.length === 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number';
+    }
+    if (report.location && typeof report.location.lng === 'number' && typeof report.location.lat === 'number') {
+      return true;
+    }
+    return false;
   };
 
   if (loading) {
@@ -390,7 +514,7 @@ const ReportsList = ({
                             <Edit />
                           </IconButton>
                         )}
-                        {hasAdminPrivileges && report.status !== 'resolved' && (
+                        {['admin', 'doctor'].includes(userRole) && report.status !== 'resolved' && (
                           <IconButton
                             size="small"
                             onClick={() => handleResolve(report)}
@@ -400,7 +524,7 @@ const ReportsList = ({
                             <Done />
                           </IconButton>
                         )}
-                        {hasAdminPrivileges && report.status === 'resolved' && (
+                        {['admin', 'doctor'].includes(userRole) && report.status === 'resolved' && (
                           <IconButton
                             size="small"
                             onClick={() => handleUndo(report)}
@@ -410,7 +534,7 @@ const ReportsList = ({
                             <Undo />
                           </IconButton>
                         )}
-                        {userRole !== 'viewer' && (
+                        {['admin', 'doctor'].includes(userRole) && (
                           <IconButton
                             size="small"
                             onClick={() => onDelete(report)}
@@ -420,6 +544,97 @@ const ReportsList = ({
                             <Delete />
                           </IconButton>
                         )}
+                        {/* Escalate to Emergency Care Button */}
+                        <Tooltip title={report.escalated ? 'Already escalated' : 'Escalate to Emergency Care'}>
+                          <span>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              onClick={() => handleOpenEscalateDialog(report)}
+                              startIcon={<Warning />}
+                              disabled={!!report.escalated}
+                            >
+                              Escalate
+                            </Button>
+                          </span>
+                        </Tooltip>
+      {/* Emergency Escalation Dialog */}
+      <Dialog
+        open={escalateDialogOpen}
+        onClose={handleCloseEscalateDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <Warning color="error" />
+            Escalate to Emergency Care
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {escalationSuccess ? (
+            <Alert severity="success">Escalation submitted successfully!</Alert>
+          ) : (
+            <>
+              <Typography gutterBottom>
+                Please provide a reason/details for escalation. This will notify emergency care authorities.
+              </Typography>
+              <FormControl fullWidth margin="normal" disabled={escalationLoading}>
+                <InputLabel>Emergency Type</InputLabel>
+                <Select
+                  value={emergencyType}
+                  label="Emergency Type"
+                  onChange={e => setEmergencyType(e.target.value)}
+                >
+                  <MenuItem value="General">General</MenuItem>
+                  <MenuItem value="Medical">Medical</MenuItem>
+                  <MenuItem value="Infectious Disease">Infectious Disease</MenuItem>
+                  <MenuItem value="Environmental">Environmental</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                fullWidth
+                label="Reason for Escalation"
+                value={escalationReason}
+                onChange={e => setEscalationReason(e.target.value)}
+                margin="normal"
+                multiline
+                rows={3}
+                disabled={escalationLoading}
+                error={!!escalationError}
+                helperText={escalationError}
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEscalateDialog} disabled={escalationLoading}>Cancel</Button>
+          {!escalationSuccess && (
+            <span title={
+              !isValidEscalationLocation(selectedReport)
+                ? 'Cannot escalate: This report does not have a valid location. Please edit the report and set a location on the map.'
+                : ''
+            }>
+              <Button
+                variant="contained"
+                color="error"
+                onClick={handleSubmitEscalation}
+                disabled={escalationLoading || !isValidEscalationLocation(selectedReport)}
+              >
+                {escalationLoading ? <CircularProgress size={22} /> : 'Escalate'}
+              </Button>
+            </span>
+          )}
+          {!isValidEscalationLocation(selectedReport) && !escalationSuccess && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              Cannot escalate: This report does not have a valid location. Please edit the report and set a location on the map.<br/>
+              <strong>Tip:</strong> Edit the report, pick a location on the map, and save before escalating.
+            </Alert>
+          )}
+        </DialogActions>
+      </Dialog>
                       </Box>
                     </Grid>
                   </Grid>
@@ -486,13 +701,15 @@ const ReportsList = ({
                      <ListItemText
                        primary="Symptoms"
                        secondary={
-                         Array.isArray(selectedReport.symptoms) 
-                           ? selectedReport.symptoms.map(symptom => 
-                               typeof symptom === 'string' 
-                                 ? symptom 
+                         Array.isArray(selectedReport.symptoms)
+                           ? selectedReport.symptoms.map(symptom =>
+                               typeof symptom === 'string'
+                                 ? symptom
                                  : symptom.name || 'Unknown symptom'
                              ).join(', ')
-                           : selectedReport.symptoms
+                           : typeof selectedReport.symptoms === 'object' && selectedReport.symptoms !== null
+                             ? selectedReport.symptoms.name || 'Unknown symptom'
+                             : selectedReport.symptoms
                        }
                      />
                    </ListItem>
@@ -664,12 +881,14 @@ const ReportsList = ({
                        fullWidth
                        label="Symptoms"
                        value={
-                         Array.isArray(selectedReport.symptoms) 
-                           ? selectedReport.symptoms.map(symptom => 
-                               typeof symptom === 'string' 
-                                 ? symptom 
+                         Array.isArray(selectedReport.symptoms)
+                           ? selectedReport.symptoms.map(symptom =>
+                               typeof symptom === 'string'
+                                 ? symptom
                                  : symptom.name || 'Unknown symptom'
-                             ).join(', ')
+                           ).join(', ')
+                         : typeof selectedReport.symptoms === 'object' && selectedReport.symptoms !== null
+                           ? selectedReport.symptoms.name || 'Unknown symptom'
                            : selectedReport.symptoms || ''
                        }
                        onChange={(e) => setSelectedReport({...selectedReport, symptoms: e.target.value})}
@@ -698,8 +917,9 @@ const ReportsList = ({
           </Button>
         </DialogActions>
       </Dialog>
+
     </Box>
   );
-};
+}
 
 export default ReportsList;
