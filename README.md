@@ -1,8 +1,8 @@
-# CareBody - Collaborative Digital Ecosystem for Inclusive Health and Well-Being
+# CareBuddy - Collaborative Digital Ecosystem for Inclusive Health and Well-Being
 
 ## 🌟 Overview
 
-CareBody is a comprehensive digital health ecosystem designed to advance SDG-3 (Good Health and Well-Being) by connecting healthcare providers, health workers, NGOs, and communities. The platform enables real-time health data tracking, telemedicine services, preventive healthcare education, and community participation to improve health outcomes across regions.
+CareBuddy is a comprehensive digital health ecosystem designed to advance SDG-3 (Good Health and Well-Being) by connecting healthcare providers, health workers, NGOs, and communities. The platform enables real-time health data tracking, telemedicine services, preventive healthcare education, and community participation to improve health outcomes across regions.
 
 ## 🎯 Mission
 
@@ -101,7 +101,7 @@ To bridge healthcare gaps and create an inclusive digital ecosystem that ensures
 ## 📁 Project Structure
 
 ```
-CareBody/
+CareBuddy/
 ├── client/                 # React frontend
 │   ├── public/
 │   ├── src/
@@ -203,6 +203,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**CareBody** - Empowering communities through collaborative healthcare technology.
+**CareBuddy** - Empowering communities through collaborative healthcare technology.
 
 
